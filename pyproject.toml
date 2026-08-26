@@ -16,6 +16,11 @@ dependencies = [
     "fitdecode>=0.10",
     "starlette>=0.40",
     "uvicorn[standard]>=0.32",
+    # Multi-user HTTP mode: password hashes and encryption at rest for other
+    # people's Garmin tokens. Not needed for the single-user stdio mode, but
+    # not worth an extra install path either.
+    "argon2-cffi>=23.1",
+    "cryptography>=43",
 ]
 
 [project.optional-dependencies]

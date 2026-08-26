@@ -143,8 +143,7 @@ def session(fit_bytes):
 
 @pytest.fixture
 def server(session):
-    srv, _ = build_server(session)
-    return srv
+    return build_server(lambda: session)
 
 
 def _blocks(server, name, args):

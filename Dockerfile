@@ -9,10 +9,9 @@ RUN pip install --upgrade pip && pip install .
 
 FROM python:3.12-slim
 ENV PATH="/opt/venv/bin:$PATH" PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
-# The server keeps three things under /data: the Garmin tokens (unless they
-# come in via GARMIN_TOKENS), the registered OAuth clients, and the FIT cache.
-ENV GARMIN_TOKENS_FILE=/data/tokens.json \
-    MCP_STATE_FILE=/data/oauth.json \
+# Everything the server keeps lives under /data: the SQLite database (accounts,
+# encrypted Garmin tokens, OAuth clients) and the per-account FIT cache.
+ENV MCP_DB=/data/app.db \
     GARMIN_MCP_CACHE=/data/cache
 COPY --from=build /opt/venv /opt/venv
 RUN useradd -u 1000 -m app && mkdir -p /data && chown app:app /data

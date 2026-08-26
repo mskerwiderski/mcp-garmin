@@ -63,6 +63,17 @@ def isolated_home(tmp_path, monkeypatch):
     """No test may read or write the real ~/.garmin-mcp."""
     monkeypatch.setenv("GARMIN_TOKENS_FILE", str(tmp_path / "tokens.json"))
     monkeypatch.setenv("GARMIN_MCP_CACHE", str(tmp_path / "cache"))
-    monkeypatch.setenv("MCP_STATE_FILE", str(tmp_path / "oauth.json"))
+    monkeypatch.setenv("MCP_DB", str(tmp_path / "app.db"))
+    monkeypatch.setenv("APP_SECRET", "test-secret")
     monkeypatch.delenv("GARMIN_TOKENS", raising=False)
+    from garmin_mcp import db
+    db.init()
     return tmp_path
+
+
+@pytest.fixture
+def user_id():
+    """A registered, invited account."""
+    from garmin_mcp import users
+    return users.create_user("anja@example.com", "supersecret123",
+                             users.create_invite("Anja"))

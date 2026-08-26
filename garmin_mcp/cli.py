@@ -53,12 +53,12 @@ async def _login() -> int:
 
 
 async def _status() -> int:
-    from .session import GarminSession, probe
+    from .session import local_session, probe
     tok = token_store.load()
     if tok is None:
         print(f"not connected (no tokens at {token_store.token_path()})")
         return 1
-    session = GarminSession()
+    session = local_session()
     try:
         info = await probe(session)
     except Exception as exc:                             # noqa: BLE001
@@ -103,8 +103,7 @@ def _serve(args: argparse.Namespace) -> int:
                     log_level="info")
         return 0
     from .server import build_server
-    server, _session = build_server()
-    server.run(transport="stdio")
+    build_server().run(transport="stdio")
     return 0
 
 

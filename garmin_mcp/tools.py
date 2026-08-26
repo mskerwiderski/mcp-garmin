@@ -15,7 +15,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 
 from . import fitview, project
 from .client import GarminError
-from .session import GarminSession, NotConnected
+from .session import NotConnected, current_session
 
 MAX_LIMIT = 100
 
@@ -41,7 +41,7 @@ def _day(value: str | None) -> str:
     return date.fromisoformat(value).isoformat()
 
 
-async def _fit(session: GarminSession, activity_id: int) -> bytes:
+async def _fit(session, activity_id: int) -> bytes:
     data = await session.fit_bytes(activity_id)
     if not data:
         raise ValueError(
@@ -49,7 +49,13 @@ async def _fit(session: GarminSession, activity_id: int) -> bytes:
     return data
 
 
-def register(server: MCPServer, session: GarminSession) -> MCPServer:
+def register(server: MCPServer, get_session=current_session) -> MCPServer:
+    """Tools resolve their session per call: over HTTP that is the account
+    behind the bearer token, over stdio the local one. `S()` is that lookup -
+    binding a session at registration time would make the whole server
+    single-tenant again."""
+    S = get_session
+
     # ---------------------------------------------------------- activities
 
     @server.tool()
@@ -66,7 +72,7 @@ def register(server: MCPServer, session: GarminSession) -> MCPServer:
         capped at 100. Returns one compact row per activity; use get_activity
         for the full record and analyze_activity_fit for what the device
         actually recorded."""
-        c = await session.client()
+        c = await S().client()
         rows = await c.search_activities(
             limit=max(1, min(int(limit), MAX_LIMIT)),
             start_date=date_from, end_date=date_to, activity_type=sport)
@@ -82,7 +88,7 @@ def register(server: MCPServer, session: GarminSession) -> MCPServer:
         These are the values Garmin computed server-side. Where elevation or
         pause handling is in question, compare with analyze_activity_fit,
         which reads the file the watch wrote."""
-        c = await session.client()
+        c = await S().client()
         return project.activity_detail(await c.get_activity_detail(int(activity_id)))
 
     # ---------------------------------------------------------- FIT analysis
@@ -98,7 +104,7 @@ def register(server: MCPServer, session: GarminSession) -> MCPServer:
         Use this when Garmin's own numbers look wrong or when the question is
         about what the watch actually measured. The file is cached, so a
         follow-up get_activity_streams for the same activity is cheap."""
-        return fitview.metrics(await _fit(session, int(activity_id)))
+        return fitview.metrics(await _fit(S(), int(activity_id)))
 
     @server.tool()
     @_guard
@@ -114,7 +120,7 @@ def register(server: MCPServer, session: GarminSession) -> MCPServer:
         every channel reports min/max/avg, so the result stays readable.
         Call it once without `channels` to see available_channels, then again
         with the ones you need. include_gps adds the route polyline."""
-        data = await _fit(session, int(activity_id))
+        data = await _fit(S(), int(activity_id))
         return fitview.stream_view(data, channels=channels,
                                    max_points=max_points, include_gps=include_gps)
 
@@ -124,7 +130,7 @@ def register(server: MCPServer, session: GarminSession) -> MCPServer:
         """Pool swim detail from the FIT: pool length, every single length
         with stroke, time and pace per 100 m, plus the active intervals with
         stroke count. Only meaningful for lap_swimming activities."""
-        return fitview.swim_view(await _fit(session, int(activity_id)))
+        return fitview.swim_view(await _fit(S(), int(activity_id)))
 
     @server.tool()
     @_guard
@@ -133,7 +139,7 @@ def register(server: MCPServer, session: GarminSession) -> MCPServer:
         grouped by the app that wrote them, with a sample value and a flag for
         fields that stayed empty or constant - that is how you tell whether an
         external sensor (Stryd, Moxy/SmO2, CORE) was actually connected."""
-        return fitview.sensors(await _fit(session, int(activity_id)))
+        return fitview.sensors(await _fit(S(), int(activity_id)))
 
     # ---------------------------------------------------------- health
 
@@ -147,8 +153,8 @@ def register(server: MCPServer, session: GarminSession) -> MCPServer:
         day is "YYYY-MM-DD" and defaults to today. Sleep is filed under the
         morning you woke up."""
         d = _day(day)
-        c = await session.client()
-        display = await session.display_id()
+        c = await S().client()
+        display = await S().display_id()
         summary = await c.get_daily_summary(display, d)
         sleep_full = await c.get_sleep_full(display, d)
         dto = (sleep_full or {}).get("dailySleepDTO") or {}
@@ -172,7 +178,7 @@ def register(server: MCPServer, session: GarminSession) -> MCPServer:
         (PRODUCTIVE, MAINTAINING, OVERREACHING …), acute load and load ratio,
         the load focus split (low aerobic / high aerobic / anaerobic) and
         VO2max for running and cycling."""
-        c = await session.client()
+        c = await S().client()
         return project.training_status(await c.get_training_status(_day(day)))
 
     @server.tool()
@@ -180,7 +186,7 @@ def register(server: MCPServer, session: GarminSession) -> MCPServer:
     async def get_body_composition(date_from: str, date_to: str) -> list[dict]:
         """Weight and body composition per day in a date range
         ("YYYY-MM-DD"). Weight and muscle mass come back in kilograms."""
-        c = await session.client()
+        c = await S().client()
         rows = await c.get_body_composition(_day(date_from), _day(date_to))
         return [project.compact({
             "day": r.get("calendarDate"),
@@ -197,7 +203,7 @@ def register(server: MCPServer, session: GarminSession) -> MCPServer:
     async def get_blood_pressure(date_from: str, date_to: str) -> list[dict]:
         """Blood pressure measurements in a date range ("YYYY-MM-DD"):
         systolic, diastolic, pulse and the measurement timestamp."""
-        c = await session.client()
+        c = await S().client()
         raw = await c.get_blood_pressure(_day(date_from), _day(date_to))
         out = []
         for summary in (raw.get("measurementSummaries") or []):
@@ -221,7 +227,7 @@ def register(server: MCPServer, session: GarminSession) -> MCPServer:
 
         sport filters on "running", "cycling" or "swimming". Take the
         challenge_id from here and pass it to get_challenge for the table."""
-        c = await session.client()
+        c = await S().client()
         rows = [project.challenge_summary(x) for x in await c.list_adhoc_challenges()]
         if sport:
             rows = [r for r in rows if r.get("sport") == sport.strip().lower()]
@@ -233,9 +239,9 @@ def register(server: MCPServer, session: GarminSession) -> MCPServer:
         """The full leaderboard of one social challenge: every player with
         rank, total distance and when they last synced. Get the challenge_id
         from list_challenges."""
-        c = await session.client()
+        c = await S().client()
         raw = await c.get_adhoc_challenge(challenge_id.strip())
-        return project.challenge_detail(raw, await session.display_id())
+        return project.challenge_detail(raw, await S().display_id())
 
     # ---------------------------------------------------------- profile
 
@@ -245,7 +251,7 @@ def register(server: MCPServer, session: GarminSession) -> MCPServer:
         """Active gear (shoes, bikes, …) with type, brand, accumulated
         distance and the distance limit set for it. Retired gear is not
         listed."""
-        c = await session.client()
+        c = await S().client()
         return project.gear(await c.list_gear())
 
     @server.tool()
@@ -255,7 +261,7 @@ def register(server: MCPServer, session: GarminSession) -> MCPServer:
         height, VO2max for running and cycling, FTP, lactate threshold heart
         rate and speed, critical swim speed, and the heart rate zones per
         sport. Useful before interpreting any training data."""
-        c = await session.client()
+        c = await S().client()
         return project.profile(await c.user_settings(),
                                await c.personal_information(),
                                await c.heart_rate_zones())
@@ -267,6 +273,6 @@ def register(server: MCPServer, session: GarminSession) -> MCPServer:
         current access token is still valid. Use it to check the connection
         before blaming empty results on missing data."""
         from .session import probe
-        return await probe(session)
+        return await probe(S())
 
     return server

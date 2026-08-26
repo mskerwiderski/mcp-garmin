@@ -1,19 +1,17 @@
 """Server entry points: stdio for local clients, streamable HTTP for the web.
 
-Local clients (Claude Desktop, Claude Code, ChatGPT desktop) speak stdio and
-need no authentication - the process belongs to the user who started it.
+stdio is single-user by definition - the process belongs to whoever started it,
+and it reads the local token file. No accounts, no passwords, no OAuth.
 
-The HTTP endpoint is /mcp and always requires a bearer token, either an OAuth
-access token from oauth.py or the static MCP_TOKEN. claude.ai and ChatGPT have
-no field for a static header, so they go through OAuth; Claude Code and Desktop
-can send MCP_TOKEN directly.
+The HTTP server is multi-tenant. It resolves the bearer token to an account,
+puts that account into a ContextVar and only then hands the request to the MCP
+session manager; the tools read the ContextVar. That is the whole tenancy
+mechanism, and it is why no request can reach another account's data.
 """
 
 from __future__ import annotations
 
-import hmac
 import json
-import os
 from contextlib import asynccontextmanager
 
 from mcp.server.mcpserver import MCPServer
@@ -22,29 +20,28 @@ from starlette.applications import Starlette
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.requests import Request
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, RedirectResponse
 from starlette.routing import Route
 from starlette.types import Receive, Scope, Send
 
-from . import oauth, tools
-from .session import GarminSession
+from . import crypto, db, oauth, session as sessions, tools, web
 
-INSTRUCTIONS = """Read-only access to a single Garmin Connect account.
+INSTRUCTIONS = """Read-only access to one Garmin Connect account.
 
 Activities: list_activities, get_activity (Garmin's own numbers),
 analyze_activity_fit / get_activity_streams / get_swim_detail /
 get_activity_sensors (the original file the watch wrote).
 Health: get_daily_health, get_training_status, get_body_composition,
-get_blood_pressure. Context: get_profile, list_gear, whoami.
+get_blood_pressure. Challenges: list_challenges, get_challenge.
+Context: get_profile, list_gear, whoami.
 
 Nothing in this server writes to Garmin Connect."""
 
 
-def build_server(session: GarminSession | None = None) -> tuple[MCPServer, GarminSession]:
-    session = session or GarminSession()
+def build_server(get_session=None) -> MCPServer:
     server = MCPServer(name="garmin-connect", instructions=INSTRUCTIONS)
-    tools.register(server, session)
-    return server, session
+    tools.register(server, get_session or sessions.current_session)
+    return server
 
 
 # --- HTTP ------------------------------------------------------------------
@@ -59,16 +56,8 @@ def _scope_bearer(scope: Scope) -> str | None:
     return None
 
 
-def _token_valid(token: str | None) -> bool:
-    if not token:
-        return False
-    static = os.environ.get("MCP_TOKEN", "")
-    if static and hmac.compare_digest(token, static):
-        return True
-    return oauth.validate_access_token(token)
-
-
 def _scope_base_url(scope: Scope) -> str:
+    import os
     configured = os.environ.get("PUBLIC_URL")
     if configured:
         return configured.rstrip("/")
@@ -100,29 +89,36 @@ class _McpEndpoint:
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             return
-        if not _token_valid(_scope_bearer(scope)):
+        user_id = oauth.access_token_user(_scope_bearer(scope) or "")
+        if user_id is None:
             await _send_unauthorized(scope, send)
             return
+        sessions.CURRENT_USER.set(user_id)
         await self._server.session_manager.handle_request(scope, receive, send)
 
 
 def build_http_app() -> Starlette:
-    server, session = build_server()
+    crypto._fernet()          # fail fast: no APP_SECRET, no server
+    db.init()
+    server = build_server()
     # Initialises the session manager lazily; the returned app is not mounted,
     # the endpoint below drives the same manager with our own auth in front.
     server.streamable_http_app(
         json_response=True, stateless_http=True,
         transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False))
-    oauth.STORE.bind(oauth.state_path())
 
     async def health(_request: Request) -> JSONResponse:
         return JSONResponse({"ok": True})
 
+    async def root(_request: Request) -> RedirectResponse:
+        return RedirectResponse("/account", status_code=302)
+
     @asynccontextmanager
     async def lifespan(_app: Starlette):
+        oauth.prune_expired()
         async with server.session_manager.run():
             yield
-        await session.aclose()
+        await sessions.close_all()
 
     return Starlette(
         middleware=[Middleware(
@@ -130,8 +126,18 @@ def build_http_app() -> Starlette:
             allow_methods=["GET", "POST", "DELETE", "OPTIONS"], allow_headers=["*"],
             expose_headers=["WWW-Authenticate"], allow_credentials=False)],
         routes=[
+            Route("/", root),
             Route("/health", health),
             Route("/healthz", health),
+            # web
+            Route("/signup", web.get_signup),
+            Route("/signup", web.post_signup, methods=["POST"]),
+            Route("/login", web.get_login),
+            Route("/login", web.post_login, methods=["POST"]),
+            Route("/logout", web.logout, methods=["GET", "POST"]),
+            Route("/account", web.get_account),
+            Route("/account/delete", web.post_delete_account, methods=["POST"]),
+            # OAuth discovery (RFC 8414 + RFC 9728)
             Route("/.well-known/oauth-protected-resource",
                   oauth.get_protected_resource_metadata),
             Route("/.well-known/oauth-protected-resource/mcp",
