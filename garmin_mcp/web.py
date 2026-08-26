@@ -204,3 +204,104 @@ async def post_delete_account(request: Request) -> Response:
     response = RedirectResponse("/login", status_code=303)
     response.delete_cookie(COOKIE, path="/")
     return response
+
+
+# --- connecting Garmin -----------------------------------------------------
+
+
+def _garmin_html(error: str = "", mfa: bool = False, email: str = "") -> str:
+    err = f'<p class="err">{esc(error)}</p>' if error else ""
+    if mfa:
+        return f"""<h1>Enter your Garmin code</h1>
+<p class="sub">Garmin sent a multi-factor code to your e-mail or app.</p>
+{err}
+<form method="post" action="/account/garmin/mfa">
+<label for="code">Code</label>
+<input id="code" name="code" inputmode="numeric" autocomplete="one-time-code"
+ required autofocus>
+<div class="row"><button>Confirm</button>
+<a class="btn secondary" href="/account/garmin">Start over</a></div></form>"""
+    return f"""<h1>Connect Garmin Connect</h1>
+{err}
+<form method="post" action="/account/garmin/login">
+<label for="gmail">Garmin e-mail</label>
+<input id="gmail" name="email" type="email" value="{esc(email)}" required autofocus>
+<label for="gpw">Garmin password</label>
+<input id="gpw" name="password" type="password" required>
+<div class="row"><button>Connect</button>
+<a class="btn secondary" href="/account">Cancel</a></div></form>
+<div class="card"><b>Your password is not stored.</b> It is used once to obtain
+Garmin's OAuth tokens; only those are kept, encrypted. This server never writes
+to your Garmin account.</div>
+<details><summary>Garmin refuses the login from here?</summary>
+<p>Garmin sometimes blocks logins coming from servers. Install the command line
+tool on your own machine, run <span class="mono">garmin-mcp login</span> and then
+<span class="mono">garmin-mcp export</span>, and paste the single line it prints
+below.</p>
+<form method="post" action="/account/garmin/blob">
+<label for="blob">Token blob</label>
+<input id="blob" name="blob" required>
+<div class="row"><button class="secondary">Import tokens</button></div></form>
+</details>"""
+
+
+async def get_garmin(request: Request) -> Response:
+    from . import connect
+    user_id = current_user(request)
+    if user_id is None:
+        return login_redirect(request)
+    return page("Connect Garmin", _garmin_html(mfa=connect.mfa_pending(user_id)))
+
+
+async def post_garmin_login(request: Request) -> Response:
+    from . import connect
+    user_id = current_user(request)
+    if user_id is None:
+        return login_redirect(request)
+    form = await request.form()
+    email = str(form.get("email") or "")
+    try:
+        done = await connect.start_login(user_id, email,
+                                         str(form.get("password") or ""))
+    except connect.ConnectError as exc:
+        return page("Connect Garmin", _garmin_html(str(exc), email=email), status=400)
+    if done:
+        return RedirectResponse("/account", status_code=303)
+    return page("Enter your Garmin code", _garmin_html(mfa=True))
+
+
+async def post_garmin_mfa(request: Request) -> Response:
+    from . import connect
+    user_id = current_user(request)
+    if user_id is None:
+        return login_redirect(request)
+    form = await request.form()
+    try:
+        await connect.submit_mfa(user_id, str(form.get("code") or ""))
+    except connect.ConnectError as exc:
+        return page("Enter your Garmin code",
+                    _garmin_html(str(exc), mfa=connect.mfa_pending(user_id)),
+                    status=400)
+    return RedirectResponse("/account", status_code=303)
+
+
+async def post_garmin_blob(request: Request) -> Response:
+    from . import connect
+    user_id = current_user(request)
+    if user_id is None:
+        return login_redirect(request)
+    form = await request.form()
+    try:
+        connect.import_blob(user_id, str(form.get("blob") or ""))
+    except connect.ConnectError as exc:
+        return page("Connect Garmin", _garmin_html(str(exc)), status=400)
+    return RedirectResponse("/account", status_code=303)
+
+
+async def post_garmin_disconnect(request: Request) -> Response:
+    from . import connect
+    user_id = current_user(request)
+    if user_id is None:
+        return login_redirect(request)
+    connect.disconnect(user_id)
+    return RedirectResponse("/account", status_code=303)

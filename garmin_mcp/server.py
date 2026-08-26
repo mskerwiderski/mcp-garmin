@@ -137,6 +137,12 @@ def build_http_app() -> Starlette:
             Route("/logout", web.logout, methods=["GET", "POST"]),
             Route("/account", web.get_account),
             Route("/account/delete", web.post_delete_account, methods=["POST"]),
+            Route("/account/garmin", web.get_garmin),
+            Route("/account/garmin/login", web.post_garmin_login, methods=["POST"]),
+            Route("/account/garmin/mfa", web.post_garmin_mfa, methods=["POST"]),
+            Route("/account/garmin/blob", web.post_garmin_blob, methods=["POST"]),
+            Route("/account/garmin/disconnect", web.post_garmin_disconnect,
+                  methods=["POST"]),
             # OAuth discovery (RFC 8414 + RFC 9728)
             Route("/.well-known/oauth-protected-resource",
                   oauth.get_protected_resource_metadata),

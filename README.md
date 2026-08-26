@@ -1,31 +1,43 @@
 # garmin-mcp
 
 Read-only MCP server for **Garmin Connect**. Ask Claude or ChatGPT about your
-own training: activities, heart rate, sleep, HRV, Body Battery, training status
-- and, unlike other Garmin MCP servers, the **original FIT file** the watch
-wrote, including Connect-IQ sensor channels (Stryd, SmO2, CORE).
+training: activities, heart rate, sleep, HRV, Body Battery, training status,
+challenge leaderboards - and, unlike other Garmin MCP servers, the **original
+FIT file** the watch wrote, including Connect-IQ sensor channels (Stryd, SmO2,
+CORE).
 
-Single user by design: you run your own instance with your own Garmin account.
 Nothing here writes to Garmin Connect.
 
-## Why the login is a local command
+## Two ways to run it
+
+**Local (stdio).** One person, no accounts, no server. The tokens live in a file
+on your machine and the MCP client starts the process on demand. This is the
+right choice for Claude Desktop and Claude Code.
+
+**Hosted (HTTP).** Several people, each with their own Garmin account, on one
+server. Needed for claude.ai and ChatGPT, which cannot start a local process.
+Registration is **invite-only**: you hand out signup links from the command
+line, and there is no open sign-up page.
+
+## Why the Garmin login is not a server thing by default
 
 Garmin's SSO sits behind Cloudflare, which since March 2026 answers fresh logins
-from datacenter IPs with 429/403. So the login runs on **your machine**:
+from datacenter IPs with 429/403. Locally that never applies:
 
 ```bash
 garmin-mcp login
 ```
 
-It handles MFA and stores the resulting OAuth1/OAuth2 tokens in
-`~/.garmin-mcp/tokens.json` (mode 0600). The OAuth1 token is valid for about a
-year and mints OAuth2 access tokens against `connectapi.garmin.com`, so the
-server never touches `sso.garmin.com` - and your Garmin password never leaves
-your machine.
+It handles MFA and stores the OAuth1/OAuth2 tokens in `~/.garmin-mcp/tokens.json`
+(mode 0600). OAuth1 is valid for about a year and mints OAuth2 access tokens
+against `connectapi.garmin.com`, so nothing after the login touches
+`sso.garmin.com`.
 
-## Install
+On a hosted server both ways exist: a login form (the password is used once and
+never stored) and, when Garmin blocks the server's IP, pasting the blob from
+`garmin-mcp export`.
 
-### 1. Local, for Claude Desktop / Claude Code / ChatGPT desktop (stdio)
+## Install: local
 
 ```bash
 uv tool install git+https://github.com/mskerwiderski/mcp-garmin
@@ -51,70 +63,42 @@ Claude Desktop (`claude_desktop_config.json`):
 }
 ```
 
-That is the whole setup. No server, no OAuth, no HTTPS.
-
-### 2. Remote, for claude.ai and ChatGPT (streamable HTTP)
-
-The web clients cannot run a local process and have no field for a static
-bearer header, so the server needs a public HTTPS URL and OAuth. Both are
-built in - you only supply a passphrase.
+## Install: hosted
 
 ```bash
-garmin-mcp login          # on your machine
-garmin-mcp export         # prints the GARMIN_TOKENS blob for the server
-```
-
-On the host:
-
-```bash
-cp .env.example .env      # set PUBLIC_URL, MCP_PASSPHRASE, GARMIN_TOKENS
+cp .env.example .env      # PUBLIC_URL and APP_SECRET, see below
 docker compose build && docker compose up -d
 ```
 
-Put a reverse proxy with TLS in front of it (Caddy is two lines):
+Put a reverse proxy with TLS in front of it. With Caddy:
 
 ```
-mcp-garmin.example.com {
-    reverse_proxy mcp-garmin:8000
+mcp.garmin.example.com {
+    reverse_proxy mcp-garmin:8000 {
+        flush_interval -1
+    }
     encode gzip
 }
 ```
 
-Then in **claude.ai**: Settings → Connectors → Add custom connector →
-`https://mcp-garmin.example.com/mcp`. Claude registers itself (RFC 7591), you
-get the consent screen, you type the passphrase, done.
+Then invite people:
 
-In **ChatGPT**: Settings → Connectors → Create (developer mode must be enabled
-for your workspace; Plus/Pro/Business), same URL, authentication OAuth.
+```bash
+docker exec mcp-garmin garmin-mcp invite create --label "Anja"
+# -> https://mcp.garmin.example.com/signup?code=...   (7 days, single use)
+```
 
-### 3. Free hosting in Germany
+Each person opens the link, creates an account, connects their Garmin, and adds
+the connector in their AI client:
 
-The container is small and needs no database. What actually works:
+- **claude.ai**: Settings -> Connectors -> Add custom connector ->
+  `https://mcp.garmin.example.com/mcp`. Claude registers itself (RFC 7591), the
+  person logs in on your server and confirms access.
+- **ChatGPT**: Settings -> Connectors -> Create (developer mode must be enabled
+  for the workspace; Plus/Pro/Business), same URL, authentication OAuth.
 
-| Host | Verdict |
-|---|---|
-| **Oracle Cloud Free Tier, `eu-frankfurt-1`** | Genuinely free, always on, own IP, persistent disk. Best free option. See below. |
-| Own VPS | If you already have one with a reverse proxy, this is 10 minutes of work. |
-| Render Free (Frankfurt) | Works, but spins down after 15 min idle and has no persistent disk. Set `GARMIN_TOKENS` and expect a cold start on the first tool call. |
-| Fly.io / Koyeb | No dependable free tier in 2026. |
-| Hugging Face Spaces | Free, but US region and it sleeps. |
-
-**Oracle Cloud Free Tier, step by step**
-
-1. Create an Always Free compute instance in `eu-frankfurt-1` (Ampere A1, or
-   two E2.1.Micro if ARM capacity is unavailable), Ubuntu 24.04.
-2. Open ports 80 and 443 **twice**: in the VCN security list *and* in the
-   instance's own firewall. The Oracle Ubuntu image ships with iptables rules
-   that drop them, and without port 80 the TLS certificate challenge fails.
-   ```bash
-   sudo iptables -I INPUT 6 -p tcp --dport 80 -j ACCEPT
-   sudo iptables -I INPUT 6 -p tcp --dport 443 -j ACCEPT
-   sudo netfilter-persistent save
-   ```
-3. Point an A record at the instance IP. A wildcard record pointing elsewhere
-   does not help - you need an explicit one that overrides it.
-4. Install Docker, copy this repo, fill `.env`, then
-   `docker compose up -d` plus a Caddy container for TLS.
+Accounts see only their own Garmin data. There is no shared bearer token and no
+admin web interface: everything administrative happens on the command line.
 
 ## Tools
 
@@ -143,35 +127,51 @@ by default with min/max/avg per channel.
 ## Commands
 
 ```
-garmin-mcp login        log in to Garmin Connect and store the tokens
-garmin-mcp status       which account, how long the access token is valid
-garmin-mcp export       tokens as a base64 blob for GARMIN_TOKENS
-garmin-mcp logout       delete the stored tokens
-garmin-mcp serve        stdio transport
-garmin-mcp serve --http streamable HTTP on /mcp
+garmin-mcp login              log in to Garmin Connect and store the tokens
+garmin-mcp status             which account, how long the access token is valid
+garmin-mcp export             tokens as a base64 blob (for GARMIN_TOKENS or import)
+garmin-mcp logout             delete the stored tokens
+garmin-mcp serve              stdio transport
+garmin-mcp serve --http       streamable HTTP on /mcp
+
+garmin-mcp invite create --label "Anja"    one-time signup link
+garmin-mcp invite list                     open, used, expired
+garmin-mcp user list                       accounts and their Garmin connection
+garmin-mcp user disable <email>            blocks immediately, tokens kept
+garmin-mcp user enable <email>
+garmin-mcp user delete <email> --yes       account, tokens and cache
 ```
 
 ## Configuration
 
 | Variable | Meaning |
 |---|---|
-| `PUBLIC_URL` | Public HTTPS URL; the OAuth discovery documents are built from it |
-| `MCP_PASSPHRASE` | Consent screen passphrase. Without it the server refuses to authorize connectors |
-| `MCP_TOKEN` | Optional static bearer for header-capable clients |
-| `GARMIN_TOKENS` | Optional base64 token blob for hosts without a disk |
-| `GARMIN_TOKENS_FILE` | Token file path (default `~/.garmin-mcp/tokens.json`) |
-| `MCP_STATE_FILE` | Registered OAuth clients (default `~/.garmin-mcp/oauth.json`) |
-| `GARMIN_MCP_CACHE` | FIT cache directory (default `~/.garmin-mcp/cache`) |
+| `PUBLIC_URL` | Public HTTPS URL; discovery documents and signup links are built from it |
+| `APP_SECRET` | Encrypts the stored Garmin tokens. The server refuses to start without it, and changing it forces everyone to reconnect |
+| `MCP_DB` | SQLite file (default `~/.garmin-mcp/app.db`, `/data/app.db` in the container) |
+| `GARMIN_MCP_CACHE` | FIT cache directory, one subdirectory per account |
+| `GARMIN_TOKENS_FILE` | stdio only: token file (default `~/.garmin-mcp/tokens.json`) |
+| `GARMIN_TOKENS` | stdio only: base64 token blob instead of a file |
 
-## Notes
+## What a hosted server stores, and what that means
 
-- This uses Garmin's **internal** Connect API, the same one every community
-  tool uses. There is no official API for individuals; Garmin's Health API is a
-  partner programme. Use this for your own account.
-- Anyone who knows `MCP_PASSPHRASE` can connect a client to your Garmin data.
-- The Garmin client and the FIT parsing are vendored from
-  [MyFITContainer](https://github.com/mskerwiderski/MyFITContainer); the file
-  headers name the source commit.
+Per account: an e-mail address, an argon2 password hash, and the Garmin OAuth
+tokens, encrypted with `APP_SECRET`. Garmin passwords are never stored. Cached
+FIT files live in a directory per account. Deleting an account removes all of it.
+
+Be clear-eyed about the encryption: it protects a stolen backup or volume
+snapshot. It does not protect against someone who owns the server, because the
+key sits in the same `.env`. For the same reason, **not** backing up this data is
+a defensible choice: tokens can be reissued in two minutes, and every backup is
+another copy of somebody else's health data.
+
+If you invite other people, you are handling their health data. Keep it
+invite-only, tell them what is stored (the signup page does), and honour
+deletion requests - the delete button does the real thing.
+
+This uses Garmin's **internal** Connect API, the same one every community tool
+uses; there is no official API for individuals. All accounts on one server share
+one IP towards Garmin, so keep the circle small.
 
 ## Development
 

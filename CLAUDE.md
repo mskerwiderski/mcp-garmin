@@ -1,45 +1,77 @@
 # mcp-garmin
 
-Read-only MCP-Server für Garmin Connect. Portfolio-weite Konventionen stehen in
-`msk-core/CONVENTIONS.md`; hier nur das Projektspezifische.
+Read-only MCP-Server für Garmin Connect, mandantenfähig. Portfolio-weite
+Konventionen stehen in `msk-core/CONVENTIONS.md`; hier nur das Projektspezifische.
 
 ## Herkunft des Codes
 
 `garmin_mcp/client.py` und `garmin_mcp/fit/*` sind **Kopien aus MyFITContainer**
 (Commit im Datei-Header). Source of truth bleibt MFC. Änderungen hier sind mit
-`mcp-garmin addition` markiert - aktuell nur `GarminClient.search_activities`,
-`GarminClient.get_activity_detail` und zwei umgebogene Modulnamen
-(`fit_parser` -> `fit.parser`, `fit_devfields` -> `fit.devfields`).
+`mcp-garmin addition` markiert - aktuell `GarminClient.search_activities`,
+`get_activity_detail`, `list_adhoc_challenges`, `get_adhoc_challenge` und zwei
+umgebogene Modulnamen (`fit_parser` -> `fit.parser`, `fit_devfields` ->
+`fit.devfields`).
 
 Wer in MFC am Garmin-Client oder an `fit_parser`/`streams` etwas repariert, muss
-hier nachziehen. Umgekehrt genauso. Ein geteiltes Package lohnt erst, wenn das
-öfter als zweimal passiert.
+hier nachziehen. Umgekehrt genauso.
 
-## Warum der Login nicht auf dem Server läuft
+## Zwei Identitäten, ein Mechanismus
 
-Garmins SSO steht hinter Cloudflare und beantwortet frische Logins von
-Rechenzentrums-IPs seit März 2026 mit 429/403. `garmin-mcp login` läuft deshalb
-lokal beim Nutzer; auf den Server wandern nur die Tokens. OAuth1 hält ~1 Jahr
-und erzeugt OAuth2-Tokens gegen `connectapi.garmin.com` - der Server fasst
-`sso.garmin.com` nie an. Das ist kein Komfort-Detail, sondern der Grund, warum
-der Connector auf Free-Tier-IPs überhaupt zuverlässig läuft.
+stdio ist Single-User: der Prozess gehört dem, der ihn startet, Tokens kommen
+aus der lokalen Datei. HTTP ist immer mandantenfähig.
 
-## MCP-SDK: 2.x, nicht 1.x
+Die ganze Trennung hängt an **einer** Stelle: `_McpEndpoint` löst den Bearer über
+`oauth.access_token_user()` zum Konto auf, setzt `session.CURRENT_USER` und gibt
+erst dann an den Session-Manager ab. Tools holen ihre Session pro Aufruf über
+`current_session()`. Eine an `register()` gebundene Session würde den Server
+sofort wieder einbenutzerfähig machen - deshalb reicht `tools.register` eine
+Funktion herum, keine Instanz.
 
-Dieses Projekt nutzt `mcp.server.mcpserver.MCPServer` (SDK 2.x). MFC hängt noch
-auf `mcp<2` (`mcp.server.fastmcp`). Die Portierung ist klein: Importpfad plus
+Verifiziert: eine ContextVar, im ASGI-Callable gesetzt, ist im Tool-Coroutine
+sichtbar (`test_two_accounts_never_see_each_other`).
+
+**Der FIT-Cache liegt je Konto in einem eigenen Unterverzeichnis.** Das sind
+fremde Trainingsdaten; ein flacher Cache wäre ein Datenleck zwischen Konten.
+
+## `db.conn()` committet nicht, wenn eine Exception durchfliegt
+
+Der Kontextmanager macht `yield` und danach `commit()`. Fliegt eine Exception
+durch den `yield`, wird der Commit übersprungen und die Verbindung schließt -
+Rollback. Der Fehlversuchs-Zähler in `verify_login` war genau deshalb wirkungslos
+(die Sperre hätte nie gegriffen). Wer in einem `with conn()`-Block schreibt und
+danach eine Exception wirft, muss den Block vorher verlassen.
+
+## Kein statischer Bearer, keine Passphrase
+
+`MCP_PASSPHRASE` und `MCP_TOKEN` gab es im Single-User-Stand; beide sind raus.
+Ein statischer Bearer lässt sich keinem Konto zuordnen und wäre in einem
+Mehrbenutzer-Server ein Generalschlüssel. claude.ai und ChatGPT haben ohnehin
+kein Feld für einen eigenen Header - der OAuth-AS in `oauth.py` ist Pflicht,
+nicht Komfort. Identität am Consent-Screen ist das Session-Cookie.
+
+## Garmin verbinden: zwei Wege, und warum beide
+
+`connect.py`. Der Web-Login spricht Garmins SSO **vom Server aus** - genau der
+Pfad, den Cloudflare bei Rechenzentrums-IPs zeitweise blockt. Deshalb gibt es
+zusätzlich den Import des Blobs aus `garmin-mcp export`, der ohne Server-Login
+auskommt. SSO-Logins sind prozessweit über einen Lock serialisiert: mehrere
+gleichzeitige Logins sind das Muster, das eine IP bei Garmin einsammelt.
+
+## MCP-SDK: 2.x
+
+`mcp.server.mcpserver.MCPServer`. MFC hängt noch auf `mcp<2`
+(`mcp.server.fastmcp`); die Portierung ist klein: Importpfad, und
 `stateless_http`/`json_response` wandern vom Konstruktor in
-`streamable_http_app()`. Der Rest - eigener Starlette-Wrapper um
-`session_manager.handle_request`, Bearer davor - bleibt gleich. `garmin_mcp/server.py`
-ist damit die Vorlage für MFCs Migration.
+`streamable_http_app()`. `garmin_mcp/server.py` ist die Vorlage dafür.
 
 ## Fehler müssen beim Client ankommen
 
 Wirft ein Tool eine beliebige Exception, meldet das SDK nur
-„Error executing tool <name>" und verschluckt die Ursache. Der häufigste Fall
-(keine Tokens) wäre damit unlesbar. Deshalb hängt an jedem Tool `_guard`, das
-`NotConnected`/`GarminError`/`ValueError` in `ToolError` übersetzt - nur die
-kommen im Klartext beim Modell an.
+„Error executing tool <name>" und verschluckt die Ursache. Deshalb hängt an jedem
+Tool `_guard`, das `NotConnected`/`GarminError`/`ValueError` in `ToolError`
+übersetzt - nur die kommen im Klartext beim Modell an. Der häufigste Fall im
+Mehrbenutzerbetrieb ist „Garmin noch nicht verbunden", und der muss den Nutzer
+zur Kontoseite führen.
 
 ## Antworten müssen klein sein
 
@@ -48,9 +80,13 @@ Kanal. Alles geht durch `project.py` bzw. `fitview.py`; Streams werden auf
 `max_points` (Default 120) nachverdichtet, je Kanal mit min/max/avg. Neue Tools
 ohne Projektion sind ein Bug, kein Feature.
 
-## Zwei Auth-Wege, und warum beide nötig sind
+## Betrieb
 
-`MCP_TOKEN` (statischer Bearer) reicht für Claude Code und Claude Desktop.
-claude.ai und ChatGPT haben **kein Feld für einen eigenen Header** - die gehen
-zwingend über den OAuth-AS in `oauth.py` (DCR + PKCE + Consent-Screen mit
-`MCP_PASSPHRASE`). Der AS ist damit Pflicht, nicht Komfort.
+`/root/mcp-garmin/` auf dem Strato-VPS nach Hausmuster, Vhost
+`mcp.garmin.skerwiderski.cloud` mit `flush_interval -1`. Alles Persistente liegt
+im Volume unter `/data` (SQLite + FIT-Cache). Kein Admin-Web: Einladungen und
+Konten laufen über `docker exec mcp-garmin garmin-mcp invite|user`.
+
+**Backup bewusst nicht.** Das Volume enthält fremde Garmin-Tokens; die sind in
+zwei Minuten neu geholt, jede Kopie ist ein zusätzliches Risiko. `APP_SECRET`
+gehört dagegen in deine Passwortverwaltung - ohne ihn müssen alle neu verbinden.
