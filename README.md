@@ -28,9 +28,12 @@ your machine.
 ### 1. Local, for Claude Desktop / Claude Code / ChatGPT desktop (stdio)
 
 ```bash
-uv tool install garmin-mcp     # or: pipx install garmin-mcp
+uv tool install git+https://github.com/mskerwiderski/mcp-garmin
+# or, from a clone:  pipx install .
 garmin-mcp login
 ```
+
+(Not on PyPI yet. Once it is, `uv tool install garmin-mcp` will do.)
 
 Claude Code:
 
