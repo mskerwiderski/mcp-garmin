@@ -1,186 +1,128 @@
 # garmin-mcp
 
-Read-only MCP server for **Garmin Connect**. Ask Claude or ChatGPT about your
-training: activities, heart rate, sleep, HRV, Body Battery, training status,
-challenge leaderboards - and, unlike other Garmin MCP servers, the **original
-FIT file** the watch wrote, including Connect-IQ sensor channels (Stryd, SmO2,
-CORE).
+**Talk to your Garmin data.** A read-only [MCP](https://modelcontextprotocol.io)
+server that lets Claude and ChatGPT answer questions about your training:
+activities, sleep, HRV, Body Battery, training status, challenge leaderboards -
+and, unlike other Garmin MCP servers, the **original FIT file** your watch
+wrote, including Connect-IQ sensor channels (Stryd, Moxy/SmO2, CORE).
 
-Nothing here writes to Garmin Connect.
-
-## Two ways to run it
-
-**Local (stdio).** One person, no accounts, no server. The tokens live in a file
-on your machine and the MCP client starts the process on demand. This is the
-right choice for Claude Desktop and Claude Code.
-
-**Hosted (HTTP).** Several people, each with their own Garmin account, on one
-server. Needed for claude.ai and ChatGPT, which cannot start a local process.
-Registration is **invite-only**: you hand out signup links from the command
-line, and there is no open sign-up page.
-
-## Why the Garmin login is not a server thing by default
-
-Garmin's SSO sits behind Cloudflare, which since March 2026 answers fresh logins
-from datacenter IPs with 429/403. Locally that never applies:
-
-```bash
-garmin-mcp login
+```
+You:  How did my last long run compare to the same route in June?
+You:  Why is my training readiness so low this morning?
+You:  Where do I stand in the running challenge, and who is ahead of me?
+You:  Did my Stryd actually record power on Tuesday's session?
 ```
 
-It handles MFA and stores the OAuth1/OAuth2 tokens in `~/.garmin-mcp/tokens.json`
-(mode 0600). OAuth1 is valid for about a year and mints OAuth2 access tokens
-against `connectapi.garmin.com`, so nothing after the login touches
-`sso.garmin.com`.
+It never writes to Garmin Connect. Every tool is read-only.
 
-On a hosted server both ways exist: a login form (the password is used once and
-never stored) and, when Garmin blocks the server's IP, pasting the blob from
-`garmin-mcp export`.
+---
 
-## Install: local
+## Pick your setup
+
+| | **Local** | **Hosted** |
+|---|---|---|
+| Works with | Claude Desktop, Claude Code | claude.ai, ChatGPT, everything above |
+| Users | just you | you and people you invite |
+| Needs | Python 3.12 | a server, a domain, Docker |
+| Setup time | 2 minutes | 20 minutes |
+| Guide | [Claude](docs/install-claude.md) · [ChatGPT](docs/install-chatgpt.md) | [Self-hosting](docs/self-hosting.md) |
+
+**Local** runs on your machine and is started by the AI client on demand.
+**Hosted** is a small web service several people can share; each account sees
+only its own Garmin data, and registration is invite-only.
+
+## Quickstart (local, 2 minutes)
 
 ```bash
 uv tool install git+https://github.com/mskerwiderski/mcp-garmin
-# or, from a clone:  pipx install .
+```
+
+```bash
 garmin-mcp login
 ```
 
-(Not on PyPI yet. Once it is, `uv tool install garmin-mcp` will do.)
+The login asks for your Garmin e-mail, password and - if you use it - your
+multi-factor code. It stores only Garmin's OAuth tokens, in
+`~/.garmin-mcp/tokens.json` with mode 0600. Your password is never written
+anywhere.
 
-Claude Code:
+Then register the server with your client:
 
 ```bash
 claude mcp add garmin -- garmin-mcp serve
 ```
 
-Claude Desktop (`claude_desktop_config.json`):
+Start a new session and ask something. Full walkthrough, including Claude
+Desktop: [docs/install-claude.md](docs/install-claude.md).
 
-```json
-{
-  "mcpServers": {
-    "garmin": { "command": "garmin-mcp", "args": ["serve"] }
-  }
-}
-```
+## Documentation
 
-## Install: hosted
-
-```bash
-cp .env.example .env      # PUBLIC_URL and APP_SECRET, see below
-docker compose build && docker compose up -d
-```
-
-Put a reverse proxy with TLS in front of it. With Caddy:
-
-```
-mcp.garmin.example.com {
-    reverse_proxy mcp-garmin:8000 {
-        flush_interval -1
-    }
-    encode gzip
-}
-```
-
-The **first account** created on a server administers it. Its account page has
-an **Administration** entry: create invitation links, see which invitations are
-open, used or expired, and see, disable or delete accounts including their
-Garmin tokens and cached files. Everyone else does not see that page at all.
-
-The same from the command line, which is the way back in if nobody can log in:
-
-```bash
-docker exec mcp-garmin garmin-mcp invite create --label "Anja"
-# -> https://mcp.garmin.example.com/signup?code=...   (7 days, single use)
-```
-
-Each person opens the link, creates an account, connects their Garmin, and adds
-the connector in their AI client:
-
-- **claude.ai**: Settings -> Connectors -> Add custom connector ->
-  `https://mcp.garmin.example.com/mcp`. Claude registers itself (RFC 7591), the
-  person logs in on your server and confirms access.
-- **ChatGPT**: Settings -> Connectors -> Create (developer mode must be enabled
-  for the workspace; Plus/Pro/Business), same URL, authentication OAuth.
-
-Accounts see only their own Garmin data, and there is no shared bearer token.
-
-## Tools
-
-| Tool | What it answers |
+| Guide | What is in it |
 |---|---|
-| `list_activities` | Activities by date range and sport |
-| `get_activity` | Garmin's own record of one activity |
-| `analyze_activity_fit` | The same activity as the **device** recorded it |
-| `get_activity_streams` | Downsampled time series, any channel in the file |
-| `get_swim_detail` | Pool swim: every length, pace per 100 m, stroke count |
-| `get_activity_sensors` | Which Connect-IQ sensors actually delivered data |
-| `get_daily_health` | Steps, RHR, stress, Body Battery, sleep, HRV, readiness |
-| `get_training_status` | Status phrase, load focus, VO2max |
-| `get_body_composition` | Weight and body composition over a range |
-| `get_blood_pressure` | Blood pressure measurements over a range |
-| `list_challenges` | Social challenges against friends, newest first |
-| `get_challenge` | The full leaderboard of one challenge |
-| `list_gear` | Shoes and bikes with accumulated distance |
-| `get_profile` | Thresholds, zones, VO2max, FTP, critical swim speed |
-| `whoami` | Which account is connected, token validity |
+| [Install for Claude](docs/install-claude.md) | Claude Desktop, Claude Code, claude.ai, troubleshooting |
+| [Install for ChatGPT](docs/install-chatgpt.md) | Developer mode, custom connector, troubleshooting |
+| [Usage examples](docs/usage.md) | What to ask, what comes back, what the numbers mean |
+| [Tool reference](docs/tools.md) | Every tool, its parameters and an example response |
+| [Self-hosting](docs/self-hosting.md) | Server setup, invitations, administration, upgrades |
+| [How it works](docs/architecture.md) | Design decisions, and the Garmin quirks behind them |
 
-Every result is projected down to the fields that matter - Garmin's raw JSON
-would eat the context window for breakfast. Streams are resampled to 120 points
-by default with min/max/avg per channel.
+## What it can answer
 
-## Commands
+**Activities** - list and filter by sport and date, Garmin's own summary of one
+activity, and the same activity as the device recorded it, straight from the
+FIT file. Time series for any channel in the file, pool swim detail down to the
+single length, and which Connect-IQ sensors actually delivered data.
 
-```
-garmin-mcp login              log in to Garmin Connect and store the tokens
-garmin-mcp status             which account, how long the access token is valid
-garmin-mcp export             tokens as a base64 blob (for GARMIN_TOKENS or import)
-garmin-mcp logout             delete the stored tokens
-garmin-mcp serve              stdio transport
-garmin-mcp serve --http       streamable HTTP on /mcp
+**Health** - one call per day gives steps, resting heart rate, stress, Body
+Battery, sleep phases with score, HRV status and training readiness. Plus
+training status with load focus and VO2max, body composition and blood pressure
+over a date range.
 
-garmin-mcp invite create --label "Anja"    one-time signup link
-garmin-mcp invite list                     open, used, expired
-garmin-mcp user list                       accounts and their Garmin connection
-garmin-mcp user disable <email>            blocks immediately, tokens kept
-garmin-mcp user enable <email>
-garmin-mcp user promote|demote <email>     access to the admin page
-garmin-mcp user delete <email> --yes       account, tokens and cache
-```
+**Context** - your thresholds and heart rate zones, your gear with accumulated
+distance, and the social challenges you run against friends, including the one
+currently in progress.
 
-## Configuration
+See [docs/tools.md](docs/tools.md) for the full list with parameters.
 
-| Variable | Meaning |
-|---|---|
-| `PUBLIC_URL` | Public HTTPS URL; discovery documents and signup links are built from it |
-| `APP_SECRET` | Encrypts the stored Garmin tokens. The server refuses to start without it, and changing it forces everyone to reconnect |
-| `MCP_DB` | SQLite file (default `~/.garmin-mcp/app.db`, `/data/app.db` in the container) |
-| `GARMIN_MCP_CACHE` | FIT cache directory, one subdirectory per account |
-| `GARMIN_TOKENS_FILE` | stdio only: token file (default `~/.garmin-mcp/tokens.json`) |
-| `GARMIN_TOKENS` | stdio only: base64 token blob instead of a file |
+## Why the login happens on your machine
 
-## What a hosted server stores, and what that means
+Garmin's SSO sits behind Cloudflare, which since March 2026 answers fresh logins
+from datacenter IPs with 429 or 403. So `garmin-mcp login` runs where you are.
+The resulting OAuth1 token is valid for about a year and mints access tokens
+against `connectapi.garmin.com`, so nothing after the login touches
+`sso.garmin.com` again.
 
-Per account: an e-mail address, an argon2 password hash, and the Garmin OAuth
-tokens, encrypted with `APP_SECRET`. Garmin passwords are never stored. Cached
-FIT files live in a directory per account. Deleting an account removes all of it.
+A hosted server offers both: a login form (the password is used once and never
+stored) and pasting the token blob from `garmin-mcp export`, which is the way in
+when Garmin blocks the server's address.
 
-Be clear-eyed about the encryption: it protects a stolen backup or volume
-snapshot. It does not protect against someone who owns the server, because the
-key sits in the same `.env`. For the same reason, **not** backing up this data is
-a defensible choice: tokens can be reissued in two minutes, and every backup is
-another copy of somebody else's health data.
+## Good to know
 
-If you invite other people, you are handling their health data. Keep it
-invite-only, tell them what is stored (the signup page does), and honour
-deletion requests - the delete button does the real thing.
+This uses Garmin's **internal** Connect API - the same one every community tool
+uses. There is no official API for individuals; Garmin's Health API is a partner
+programme. Use this for your own account, and keep a hosted instance to people
+you actually know: all accounts on one server share one address towards Garmin.
 
-This uses Garmin's **internal** Connect API, the same one every community tool
-uses; there is no official API for individuals. All accounts on one server share
-one IP towards Garmin, so keep the circle small.
+Responses are deliberately small. Garmin answers with hundreds of fields per
+activity and time series of thousands of points; everything is projected down to
+what a model can actually use, and streams are resampled with min/max/avg per
+channel. That is not cosmetic - the raw payloads would eat the context window
+the conversation needs.
 
 ## Development
 
 ```bash
 python3.12 -m venv .venv && .venv/bin/pip install -e ".[dev]"
+```
+
+```bash
 .venv/bin/pytest
 ```
+
+94 tests, no network access required - the Garmin API and the FIT files are
+stubbed or synthesised. See [docs/architecture.md](docs/architecture.md) for how
+the pieces fit together.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
