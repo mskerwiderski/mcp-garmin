@@ -1,8 +1,14 @@
-# Self-hosting
+# Self-hosting on a server
 
-A hosted instance is what claude.ai and ChatGPT need, and it is what lets you
-share the server with people you invite. Everyone gets their own account and
-their own Garmin connection; nobody sees anybody else's data.
+The third of the [three ways](../README.md#three-ways-to-use-it) to use this:
+your own instance, on your own machine, for you and whoever you invite. Everyone
+gets their own account and their own Garmin connection; nobody sees anybody
+else's data.
+
+This is what claude.ai and ChatGPT need. If you only use Claude Desktop or
+Claude Code and want nothing on a server, the local route in
+[install-claude.md](install-claude.md) is simpler. If you would rather not run
+anything at all, ask for [guest access](guest-access.md).
 
 Plan for about twenty minutes.
 

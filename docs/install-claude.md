@@ -119,15 +119,15 @@ appear under the connectors icon in the message box.
 
 ## 3. claude.ai
 
-The browser cannot start a local process, so this needs a hosted instance -
-either your own ([self-hosting guide](self-hosting.md)) or one you were invited
-to.
+The browser cannot start a local process, so this needs a hosted instance. Three
+ways to get one: be [invited as a guest](guest-access.md) to an existing
+instance, [run your own](self-hosting.md), or use one a friend runs.
 
-### If you were invited
+### Sign up on the instance
 
-1. Open the invitation link you were sent. It looks like
+1. Open the invitation link you were given. It looks like
    `https://mcp.example.com/signup?code=...`, works once and expires after seven
-   days.
+   days. No link yet? See [guest access](guest-access.md).
 2. Create your account with an e-mail address and a password of at least ten
    characters.
 3. On your account page, click **Connect Garmin** and enter your Garmin
@@ -140,7 +140,16 @@ to.
 
 ### Add the connector
 
-1. In claude.ai: **Settings → Connectors → Add custom connector**.
+Claude Code can also use a remote instance instead of a local process:
+
+```bash
+claude mcp add --transport http garmin https://mcp.example.com/mcp
+```
+
+Run `/mcp` in a session afterwards to complete the OAuth login. For claude.ai in
+the browser:
+
+1. **Settings → Connectors → Add custom connector**.
 2. Paste the URL, for example `https://mcp.example.com/mcp`.
 3. Claude registers itself and sends you to the server's login page. Log in with
    the account from step 2 and click **Allow**.

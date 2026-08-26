@@ -17,21 +17,36 @@ It never writes to Garmin Connect. Every tool is read-only.
 
 ---
 
-## Pick your setup
+## Three ways to use it
 
-| | **Local** | **Hosted** |
-|---|---|---|
-| Works with | Claude Desktop, Claude Code | claude.ai, ChatGPT, everything above |
-| Users | just you | you and people you invite |
-| Needs | Python 3.12 | a server, a domain, Docker |
-| Setup time | 2 minutes | 20 minutes |
-| Guide | [Claude](docs/install-claude.md) · [ChatGPT](docs/install-chatgpt.md) | [Self-hosting](docs/self-hosting.md) |
+| | **1. Guest access** | **2. Local** | **3. Your own server** |
+|---|---|---|---|
+| You need | an invitation | Python 3.12 | a server, a domain, Docker |
+| You run | nothing | the server on your machine | the server for you and your friends |
+| Works with | claude.ai, ChatGPT, Claude Desktop, Claude Code | Claude Desktop, Claude Code | everything |
+| Setup | 5 minutes | 2 minutes | 20 minutes |
+| Your data lives | on Michael's server | only on your machine | on your server |
+| Guide | [Guest access](docs/guest-access.md) | [below](#quickstart-local) | [Self-hosting](docs/self-hosting.md) |
 
-**Local** runs on your machine and is started by the AI client on demand.
-**Hosted** is a small web service several people can share; each account sees
-only its own Garmin data, and registration is invite-only.
+**1. Guest access** - the fastest way, and the only one that needs no
+infrastructure at all. Ask for an invitation, create an account, connect your
+Garmin, done. This is also the only route that works with **claude.ai in the
+browser and with ChatGPT**, since neither can start a program on your computer.
 
-## Quickstart (local, 2 minutes)
+> Want an invitation? Send a short mail to **michael@skerwiderski.de**. You get
+> a one-time signup link. Your Garmin tokens are stored encrypted, nobody else
+> can see your data, and you can delete your account with everything in it at
+> any time, yourself, with one button.
+
+**2. Local** - nothing leaves your machine, no accounts, no server. Your AI
+client starts the process when it needs it. Best if you use Claude Desktop or
+Claude Code anyway and want to keep everything local.
+
+**3. Your own server** - the same software as behind guest access. Run it for
+yourself, invite whoever you like, own the data. See
+[docs/self-hosting.md](docs/self-hosting.md).
+
+## Quickstart (local)
 
 ```bash
 uv tool install git+https://github.com/mskerwiderski/mcp-garmin
@@ -59,6 +74,7 @@ Desktop: [docs/install-claude.md](docs/install-claude.md).
 
 | Guide | What is in it |
 |---|---|
+| [Guest access](docs/guest-access.md) | Getting an invitation and using it, start to finish |
 | [Install for Claude](docs/install-claude.md) | Claude Desktop, Claude Code, claude.ai, troubleshooting |
 | [Install for ChatGPT](docs/install-chatgpt.md) | Developer mode, custom connector, troubleshooting |
 | [Usage examples](docs/usage.md) | What to ask, what comes back, what the numbers mean |

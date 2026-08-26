@@ -1,8 +1,9 @@
 # Installing for ChatGPT
 
 ChatGPT can only talk to a server it can reach over HTTPS - it cannot start a
-program on your computer. So this route always needs a hosted instance, either
-your own ([self-hosting guide](self-hosting.md)) or one you were invited to.
+program on your computer. So this route always needs a hosted instance: be
+[invited as a guest](guest-access.md) to one that already runs, or
+[host your own](self-hosting.md).
 
 If you want the local, no-server route, use Claude Desktop or Claude Code
 instead: [install-claude.md](install-claude.md).
@@ -17,8 +18,9 @@ instead: [install-claude.md](install-claude.md).
 
 ## 1. Create your account
 
-Open the invitation link you were sent (`https://mcp.example.com/signup?code=...`).
-It works once and expires after seven days. Choose an e-mail address and a
+Open the invitation link you were given
+(`https://mcp.example.com/signup?code=...`). It works once and expires after
+seven days. No link yet? See [guest access](guest-access.md). Choose an e-mail address and a
 password of at least ten characters.
 
 ## 2. Connect Garmin
