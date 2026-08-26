@@ -2,7 +2,7 @@
 
 Read-only MCP server for **Garmin Connect**. Ask Claude or ChatGPT about your
 own training: activities, heart rate, sleep, HRV, Body Battery, training status
-— and, unlike other Garmin MCP servers, the **original FIT file** the watch
+- and, unlike other Garmin MCP servers, the **original FIT file** the watch
 wrote, including Connect-IQ sensor channels (Stryd, SmO2, CORE).
 
 Single user by design: you run your own instance with your own Garmin account.
@@ -20,7 +20,7 @@ garmin-mcp login
 It handles MFA and stores the resulting OAuth1/OAuth2 tokens in
 `~/.garmin-mcp/tokens.json` (mode 0600). The OAuth1 token is valid for about a
 year and mints OAuth2 access tokens against `connectapi.garmin.com`, so the
-server never touches `sso.garmin.com` — and your Garmin password never leaves
+server never touches `sso.garmin.com` - and your Garmin password never leaves
 your machine.
 
 ## Install
@@ -57,7 +57,7 @@ That is the whole setup. No server, no OAuth, no HTTPS.
 
 The web clients cannot run a local process and have no field for a static
 bearer header, so the server needs a public HTTPS URL and OAuth. Both are
-built in — you only supply a passphrase.
+built in - you only supply a passphrase.
 
 ```bash
 garmin-mcp login          # on your machine
@@ -112,7 +112,7 @@ The container is small and needs no database. What actually works:
    sudo netfilter-persistent save
    ```
 3. Point an A record at the instance IP. A wildcard record pointing elsewhere
-   does not help — you need an explicit one that overrides it.
+   does not help - you need an explicit one that overrides it.
 4. Install Docker, copy this repo, fill `.env`, then
    `docker compose up -d` plus a Caddy container for TLS.
 
@@ -134,7 +134,7 @@ The container is small and needs no database. What actually works:
 | `get_profile` | Thresholds, zones, VO2max, FTP, critical swim speed |
 | `whoami` | Which account is connected, token validity |
 
-Every result is projected down to the fields that matter — Garmin's raw JSON
+Every result is projected down to the fields that matter - Garmin's raw JSON
 would eat the context window for breakfast. Streams are resampled to 120 points
 by default with min/max/avg per channel.
 
