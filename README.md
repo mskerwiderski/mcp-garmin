@@ -130,6 +130,8 @@ The container is small and needs no database. What actually works:
 | `get_training_status` | Status phrase, load focus, VO2max |
 | `get_body_composition` | Weight and body composition over a range |
 | `get_blood_pressure` | Blood pressure measurements over a range |
+| `list_challenges` | Social challenges against friends, newest first |
+| `get_challenge` | The full leaderboard of one challenge |
 | `list_gear` | Shoes and bikes with accumulated distance |
 | `get_profile` | Thresholds, zones, VO2max, FTP, critical swim speed |
 | `whoami` | Which account is connected, token validity |

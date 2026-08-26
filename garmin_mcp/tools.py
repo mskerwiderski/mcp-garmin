@@ -211,6 +211,32 @@ def register(server: MCPServer, session: GarminSession) -> MCPServer:
                 }))
         return out
 
+    # ---------------------------------------------------------- challenges
+
+    @server.tool()
+    @_guard
+    async def list_challenges(sport: str | None = None, limit: int = 10) -> list[dict]:
+        """Social challenges against friends ("Lauf-Challenge" and the like),
+        newest first: name, period, how many players and where you ranked.
+
+        sport filters on "running", "cycling" or "swimming". Take the
+        challenge_id from here and pass it to get_challenge for the table."""
+        c = await session.client()
+        rows = [project.challenge_summary(x) for x in await c.list_adhoc_challenges()]
+        if sport:
+            rows = [r for r in rows if r.get("sport") == sport.strip().lower()]
+        return rows[:max(1, min(int(limit), MAX_LIMIT))]
+
+    @server.tool()
+    @_guard
+    async def get_challenge(challenge_id: str) -> dict:
+        """The full leaderboard of one social challenge: every player with
+        rank, total distance and when they last synced. Get the challenge_id
+        from list_challenges."""
+        c = await session.client()
+        raw = await c.get_adhoc_challenge(challenge_id.strip())
+        return project.challenge_detail(raw, await session.display_id())
+
     # ---------------------------------------------------------- profile
 
     @server.tool()

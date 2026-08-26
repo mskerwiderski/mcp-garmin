@@ -195,3 +195,33 @@ def profile(settings: dict, bio: dict, zones: list[dict]) -> dict:
             "floors": [z.get(f"zone{i}Floor") for i in range(1, 6)],
         }) for z in zones],
     })
+
+
+# Garmin's socialChallengeActivityTypeId. All three count metres.
+CHALLENGE_SPORT = {1: "running", 2: "cycling", 3: "swimming"}
+
+
+def challenge_summary(c: dict) -> dict:
+    return compact({
+        "challenge_id": c.get("uuid"),
+        "name": c.get("adHocChallengeName"),
+        "sport": CHALLENGE_SPORT.get(c.get("socialChallengeActivityTypeId")),
+        "start": (c.get("startDate") or "")[:10],
+        "end": (c.get("endDate") or "")[:10],
+        "my_rank": c.get("userRanking"),
+        "players": c.get("playerCount"),
+    })
+
+
+def challenge_detail(c: dict, my_display_name: str = "") -> dict:
+    sport = CHALLENGE_SPORT.get(c.get("socialChallengeActivityTypeId"))
+    board = []
+    for p in sorted(c.get("players") or [], key=lambda p: p.get("ranking") or 999):
+        total = p.get("totalNumber")
+        row = {"rank": p.get("ranking"), "name": p.get("fullName"),
+               "total_km": _km(total) if sport else None,
+               "last_sync": (p.get("lastSyncTime") or "")[:10]}
+        if my_display_name and p.get("displayName") == my_display_name:
+            row["is_you"] = True
+        board.append(compact(row))
+    return compact({**challenge_summary(c), "leaderboard": board})

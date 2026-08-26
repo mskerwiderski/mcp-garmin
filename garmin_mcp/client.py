@@ -1596,3 +1596,27 @@ class GarminClient:
         if r.status_code != 200:
             raise GarminError(f"activity {activity_id} HTTP {r.status_code}")
         return r.json() or {}
+
+    async def list_adhoc_challenges(self) -> list[dict]:
+        """Social ("ad hoc") challenges - the ones you run against friends.
+        The endpoint is called `historical` but returns every challenge the
+        account ever joined, newest first, and ignores start/limit."""
+        r = await self._http.get(
+            f"{CONNECT_API}/adhocchallenge-service/adHocChallenge/historical",
+            headers=await self._bearer())
+        if r.status_code != 200:
+            raise GarminError(f"adhoc challenges HTTP {r.status_code}")
+        arr = r.json() or []
+        return arr if isinstance(arr, list) else []
+
+    async def get_adhoc_challenge(self, uuid: str) -> dict:
+        """One social challenge including its leaderboard (`players`). The
+        list endpoint returns players=[]; only this one fills it."""
+        r = await self._http.get(
+            f"{CONNECT_API}/adhocchallenge-service/adHocChallenge/{uuid}",
+            headers=await self._bearer())
+        if r.status_code == 404:
+            raise GarminError(f"challenge {uuid} not found")
+        if r.status_code != 200:
+            raise GarminError(f"challenge {uuid} HTTP {r.status_code}")
+        return r.json() or {}

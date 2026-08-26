@@ -28,6 +28,21 @@ ACTIVITY_DETAIL = {
 }
 
 
+CHALLENGE = {
+    "uuid": "RUN1", "adHocChallengeName": "Lauf-Challenge",
+    "socialChallengeActivityTypeId": 1, "startDate": "2026-07-01T00:00:00.0",
+    "endDate": "2026-07-31T23:59:59.0", "userRanking": 3, "playerCount": 3,
+    "players": [
+        {"ranking": 2, "fullName": "Second Place", "totalNumber": 175048.3,
+         "displayName": "other-guid", "lastSyncTime": "2026-07-31T15:16:26.0"},
+        {"ranking": 1, "fullName": "First Place", "totalNumber": 210389.5,
+         "displayName": "another-guid", "lastSyncTime": "2026-08-01T11:56:08.0"},
+        {"ranking": 3, "fullName": "Test Athlete", "totalNumber": 173547.0,
+         "displayName": "display-guid", "lastSyncTime": "2026-08-01T09:00:00.0"},
+    ],
+}
+
+
 class FakeClient:
     def __init__(self, fit: bytes) -> None:
         self._fit = fit
@@ -96,6 +111,14 @@ class FakeClient:
     async def fetch_display_name(self):
         return "Test Athlete"
 
+    async def list_adhoc_challenges(self):
+        return [CHALLENGE, {**CHALLENGE, "uuid": "BIKE1",
+                            "adHocChallengeName": "Radfahr-Challenge",
+                            "socialChallengeActivityTypeId": 2}]
+
+    async def get_adhoc_challenge(self, uuid):
+        return CHALLENGE
+
 
 class FakeSession:
     def __init__(self, fit: bytes) -> None:
@@ -147,7 +170,8 @@ def test_all_tools_are_registered(server):
         "list_activities", "get_activity", "analyze_activity_fit",
         "get_activity_streams", "get_swim_detail", "get_activity_sensors",
         "get_daily_health", "get_training_status", "get_body_composition",
-        "get_blood_pressure", "list_gear", "get_profile", "whoami"}
+        "get_blood_pressure", "list_challenges", "get_challenge", "list_gear",
+        "get_profile", "whoami"}
 
 
 def test_every_tool_has_a_description(server):
@@ -241,3 +265,18 @@ def test_gear_uses_the_v2_field_names(server):
 def test_bad_day_is_rejected(server):
     with pytest.raises(Exception):
         call(server, "get_daily_health", day="20th of August")
+
+
+def test_list_challenges_filters_by_sport(server):
+    rows = call_list(server, "list_challenges", sport="cycling")
+    assert [r["name"] for r in rows] == ["Radfahr-Challenge"]
+
+
+def test_challenge_leaderboard_is_sorted_and_marks_you(server):
+    d = call(server, "get_challenge", challenge_id="RUN1")
+    assert d["sport"] == "running" and d["start"] == "2026-07-01"
+    assert [p["rank"] for p in d["leaderboard"]] == [1, 2, 3]
+    assert d["leaderboard"][0] == {"rank": 1, "name": "First Place",
+                                   "total_km": 210.389, "last_sync": "2026-08-01"}
+    you = [p for p in d["leaderboard"] if p.get("is_you")]
+    assert len(you) == 1 and you[0]["name"] == "Test Athlete"
