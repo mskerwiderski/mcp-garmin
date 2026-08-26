@@ -81,7 +81,12 @@ mcp.garmin.example.com {
 }
 ```
 
-Then invite people:
+The **first account** created on a server administers it. Its account page has
+an **Administration** entry: create invitation links, see which invitations are
+open, used or expired, and see, disable or delete accounts including their
+Garmin tokens and cached files. Everyone else does not see that page at all.
+
+The same from the command line, which is the way back in if nobody can log in:
 
 ```bash
 docker exec mcp-garmin garmin-mcp invite create --label "Anja"
@@ -97,8 +102,7 @@ the connector in their AI client:
 - **ChatGPT**: Settings -> Connectors -> Create (developer mode must be enabled
   for the workspace; Plus/Pro/Business), same URL, authentication OAuth.
 
-Accounts see only their own Garmin data. There is no shared bearer token and no
-admin web interface: everything administrative happens on the command line.
+Accounts see only their own Garmin data, and there is no shared bearer token.
 
 ## Tools
 
@@ -139,6 +143,7 @@ garmin-mcp invite list                     open, used, expired
 garmin-mcp user list                       accounts and their Garmin connection
 garmin-mcp user disable <email>            blocks immediately, tokens kept
 garmin-mcp user enable <email>
+garmin-mcp user promote|demote <email>     access to the admin page
 garmin-mcp user delete <email> --yes       account, tokens and cache
 ```
 

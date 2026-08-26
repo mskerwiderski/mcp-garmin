@@ -80,6 +80,25 @@ Kanal. Alles geht durch `project.py` bzw. `fitview.py`; Streams werden auf
 `max_points` (Default 120) nachverdichtet, je Kanal mit min/max/avg. Neue Tools
 ohne Projektion sind ein Bug, kein Feature.
 
+## Admin-Oberfläche
+
+`/admin`, sichtbar nur für Konten mit `users.is_admin`. Das **erste** Konto eines
+Servers bekommt das Flag automatisch (`create_user`), ältere Datenbanken ohne
+Admin bekommen es beim nächsten `db.init()` für das älteste Konto - beides
+absichtlich implizit, weil sonst niemand an die Seite käme, ohne SSH zu haben.
+
+Ein Nicht-Admin bekommt **404, nicht 403**: die Existenz der Seite ist selbst
+eine Information. Der Admin kann sein eigenes Konto dort nicht ändern (sonst
+sperrt man sich aus), und `set_admin` weigert sich, den letzten Admin zu
+degradieren.
+
+Die CLI (`garmin-mcp invite|user`) bleibt vollwertig bestehen - sie ist der Weg
+zurück, wenn sich niemand mehr einloggen kann.
+
+Bewusst in Kauf genommen: Mit der Seite kann ein gestohlenes Session-Cookie
+Konten anlegen und löschen; vorher brauchte das SSH-Zugang. Deshalb das
+Admin-Flag statt „jeder eingeloggte Nutzer".
+
 ## Betrieb
 
 `/root/mcp-garmin/` auf dem Strato-VPS nach Hausmuster, Vhost

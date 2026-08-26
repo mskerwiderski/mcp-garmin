@@ -74,10 +74,13 @@ def create_user(email: str, password: str, invite_code: str) -> int:
             raise UserError("An account with this e-mail already exists.")
         label = (c.execute("SELECT label FROM invites WHERE code=?",
                            (invite_code,)).fetchone() or {"label": ""})["label"]
+        # The first account on a fresh server administers it - somebody has to,
+        # and it is whoever created the invitation for themselves.
+        first = c.execute("SELECT 1 FROM users LIMIT 1").fetchone() is None
         cur = c.execute(
-            "INSERT INTO users (email, password_hash, label, created_at_ms)"
-            " VALUES (?,?,?,?)",
-            (email, _hasher.hash(password), label, now_ms()))
+            "INSERT INTO users (email, password_hash, label, created_at_ms, is_admin)"
+            " VALUES (?,?,?,?,?)",
+            (email, _hasher.hash(password), label, now_ms(), 1 if first else 0))
         user_id = int(cur.lastrowid)
         c.execute("UPDATE invites SET used_at_ms=?, used_by=? WHERE code=?",
                   (now_ms(), user_id, invite_code))
@@ -122,9 +125,28 @@ def verify_login(email: str, password: str) -> int:
 
 def get_user(user_id: int) -> dict | None:
     with conn() as c:
-        row = c.execute("SELECT id, email, label, status, created_at_ms, last_seen_ms"
-                        " FROM users WHERE id=?", (user_id,)).fetchone()
+        row = c.execute("SELECT id, email, label, status, created_at_ms, last_seen_ms,"
+                        " is_admin FROM users WHERE id=?", (user_id,)).fetchone()
     return dict(row) if row else None
+
+
+def is_admin(user_id: int | None) -> bool:
+    if user_id is None:
+        return False
+    user = get_user(user_id)
+    return bool(user and user["is_admin"] and user["status"] == "active")
+
+
+def set_admin(user_id: int, admin: bool) -> None:
+    """Refuses to remove the last admin - locking yourself out of your own
+    server would need SSH to undo."""
+    with conn() as c:
+        if not admin:
+            others = c.execute("SELECT COUNT(*) AS n FROM users WHERE is_admin=1"
+                               " AND id<>?", (user_id,)).fetchone()["n"]
+            if not others:
+                raise UserError("This is the only administrator left.")
+        c.execute("UPDATE users SET is_admin=? WHERE id=?", (1 if admin else 0, user_id))
 
 
 def user_id_by_email(email: str) -> int | None:
@@ -138,7 +160,7 @@ def list_users() -> list[dict]:
     with conn() as c:
         rows = c.execute(
             "SELECT u.id, u.email, u.label, u.status, u.created_at_ms, u.last_seen_ms,"
-            " g.account AS garmin_account FROM users u"
+            " u.is_admin, g.account AS garmin_account FROM users u"
             " LEFT JOIN garmin_tokens g ON g.user_id = u.id"
             " ORDER BY u.created_at_ms").fetchall()
     return [dict(r) for r in rows]

@@ -143,6 +143,10 @@ def build_http_app() -> Starlette:
             Route("/account/garmin/blob", web.post_garmin_blob, methods=["POST"]),
             Route("/account/garmin/disconnect", web.post_garmin_disconnect,
                   methods=["POST"]),
+            Route("/admin", web.get_admin),
+            Route("/admin/invite", web.post_admin_invite, methods=["POST"]),
+            Route("/admin/user/{user_id:int}/{action}", web.post_admin_user,
+                  methods=["POST"]),
             # OAuth discovery (RFC 8414 + RFC 9728)
             Route("/.well-known/oauth-protected-resource",
                   oauth.get_protected_resource_metadata),

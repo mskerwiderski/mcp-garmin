@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS users (
     created_at_ms INTEGER NOT NULL,
     last_seen_ms  INTEGER,
     failed_logins INTEGER NOT NULL DEFAULT 0,
-    locked_until_ms INTEGER
+    locked_until_ms INTEGER,
+    is_admin      INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS invites (
@@ -104,3 +105,21 @@ def conn():
 def init() -> None:
     with conn() as c:
         c.executescript(SCHEMA)
+        _migrate(c)
+
+
+def _migrate(c) -> None:
+    """Additive migrations for databases created by an earlier version.
+
+    Small enough to keep here; a migration framework for two ALTERs would be
+    ceremony. Each step must be safe to run again.
+    """
+    columns = {r["name"] for r in c.execute("PRAGMA table_info(users)")}
+    if "is_admin" not in columns:
+        c.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0")
+    # A database with accounts but no admin predates the admin page: the oldest
+    # account is the person who set the server up.
+    has_users = c.execute("SELECT 1 FROM users LIMIT 1").fetchone()
+    has_admin = c.execute("SELECT 1 FROM users WHERE is_admin=1 LIMIT 1").fetchone()
+    if has_users and not has_admin:
+        c.execute("UPDATE users SET is_admin=1 WHERE id=(SELECT MIN(id) FROM users)")

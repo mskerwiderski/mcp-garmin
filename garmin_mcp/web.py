@@ -32,6 +32,10 @@ label{font-weight:600;font-size:.9rem}
 .mono{font-family:ui-monospace,monospace;font-size:.85rem;color:#888;word-break:break-all}
 .err{color:#b23c3c}.ok{color:#2e7d32}
 .row{display:flex;gap:.5rem;margin-top:1.2rem;flex-wrap:wrap}
+table{width:100%;border-collapse:collapse;margin:.5rem 0}
+td{border-top:1px solid #8884;padding:.5rem .3rem;vertical-align:top;font-size:.92rem}
+h2{font-size:1.05rem;margin-top:1.6rem}
+form{margin:0}
 """
 
 
@@ -180,6 +184,9 @@ async def get_account(request: Request) -> Response:
     else:
         garmin = ('<p>Not connected yet - the tools cannot answer anything until '
                   'you do.</p><a class="btn" href="/account/garmin">Connect Garmin</a>')
+    admin_card = ('<div class="card"><b>Administration</b><br>'
+                  '<a class="btn" href="/admin">Invitations and accounts</a></div>'
+                  if users.is_admin(user_id) else "")
     return page("Your account", f"""<h1>Your account</h1>
 <p class="sub">{esc(user["email"])}</p>
 <div class="card"><b>Garmin Connect</b><br>{garmin}</div>
@@ -187,6 +194,7 @@ async def get_account(request: Request) -> Response:
 Add a custom connector with this URL:<br>
 <span class="mono">{esc(url)}</span><br>
 You will be asked to log in here once and to confirm access.</div>
+{admin_card}
 <div class="row">
 <a class="btn secondary" href="/logout">Log out</a>
 <form method="post" action="/account/delete"
@@ -305,3 +313,121 @@ async def post_garmin_disconnect(request: Request) -> Response:
         return login_redirect(request)
     connect.disconnect(user_id)
     return RedirectResponse("/account", status_code=303)
+
+
+# --- administration --------------------------------------------------------
+#
+# Reachable only for accounts with the admin flag, and a non-admin gets a 404
+# rather than a 403: there is no reason to confirm that this page exists.
+
+
+def _require_admin(request: Request):
+    user_id = current_user(request)
+    if user_id is None:
+        return None, login_redirect(request)
+    if not users.is_admin(user_id):
+        return None, page("Not found", "<h1>Not found</h1>", status=404)
+    return user_id, None
+
+
+def _ms(value) -> str:
+    import datetime as dt
+    return (dt.datetime.fromtimestamp(value / 1000).strftime("%Y-%m-%d %H:%M")
+            if value else "-")
+
+
+def _admin_html(admin_id: int, new_link: str = "", error: str = "") -> str:
+    err = f'<p class="err">{esc(error)}</p>' if error else ""
+    link = ""
+    if new_link:
+        link = (f'<div class="card"><b class="ok">Invitation created</b><br>'
+                f'<span class="mono">{esc(new_link)}</span><br>'
+                f'Valid for 7 days, single use. Send it to the person directly.</div>')
+
+    rows = []
+    for u in users.list_users():
+        badge = " (admin)" if u["is_admin"] else ""
+        state = ("active" if u["status"] == "active" else
+                 '<span class="err">disabled</span>')
+        garmin = esc(u["garmin_account"]) if u["garmin_account"] else "- not connected -"
+        if u["id"] == admin_id:
+            actions = '<span class="mono">that is you</span>'
+        else:
+            toggle = "enable" if u["status"] != "active" else "disable"
+            actions = (
+                f'<form method="post" action="/admin/user/{u["id"]}/{toggle}"'
+                f' style="display:inline"><button class="secondary">{toggle}</button></form> '
+                f'<form method="post" action="/admin/user/{u["id"]}/delete"'
+                f' style="display:inline" onsubmit="return confirm('
+                f"'Delete {esc(u['email'])}, their Garmin tokens and cached files?'"
+                f')"><button class="danger">delete</button></form>')
+        rows.append(
+            f'<tr><td>{esc(u["email"])}{badge}<br><span class="mono">{garmin}</span></td>'
+            f'<td>{state}<br><span class="mono">seen {_ms(u["last_seen_ms"])}</span></td>'
+            f'<td>{actions}</td></tr>')
+    users_table = ("<p>No accounts yet.</p>" if not rows else
+                   '<table><tbody>' + "".join(rows) + "</tbody></table>")
+
+    inv_rows = []
+    for i in users.list_invites():
+        cls = {"open": "ok", "used": "", "expired": "err"}[i["state"]]
+        inv_rows.append(
+            f'<tr><td>{esc(i["label"] or "-")}</td>'
+            f'<td class="{cls}">{i["state"]}</td>'
+            f'<td class="mono">expires {_ms(i["expires_at_ms"])}</td></tr>')
+    invites_table = ("<p>No invitations yet.</p>" if not inv_rows else
+                     '<table><tbody>' + "".join(inv_rows) + "</tbody></table>")
+
+    return f"""<h1>Administration</h1>
+<p class="sub">Accounts and invitations for this server.</p>
+{err}{link}
+<div class="card"><b>Invite someone</b>
+<form method="post" action="/admin/invite">
+<label for="label">Who is it for? (a note for you, shown nowhere else)</label>
+<input id="label" name="label" placeholder="Anja">
+<div class="row"><button>Create invitation link</button></div></form></div>
+<h2>Accounts</h2>
+{users_table}
+<h2>Invitations</h2>
+{invites_table}
+<div class="row"><a class="btn secondary" href="/account">Back to your account</a></div>"""
+
+
+async def get_admin(request: Request) -> Response:
+    admin_id, err = _require_admin(request)
+    if err is not None:
+        return err
+    return page("Administration", _admin_html(admin_id))
+
+
+async def post_admin_invite(request: Request) -> Response:
+    admin_id, err = _require_admin(request)
+    if err is not None:
+        return err
+    form = await request.form()
+    code = users.create_invite(str(form.get("label") or "")[:80])
+    return page("Administration",
+                _admin_html(admin_id, f"{base_url(request)}/signup?code={code}"))
+
+
+async def post_admin_user(request: Request) -> Response:
+    admin_id, err = _require_admin(request)
+    if err is not None:
+        return err
+    target = int(request.path_params["user_id"])
+    action = request.path_params["action"]
+    if target == admin_id:
+        return page("Administration",
+                    _admin_html(admin_id, error="You cannot change your own account "
+                                                "here - use the account page."),
+                    status=400)
+    if users.get_user(target) is None:
+        return page("Administration", _admin_html(admin_id, error="No such account."),
+                    status=404)
+    if action == "delete":
+        from .session import forget_user
+        forget_user(target)
+        users.delete_user(target)
+    else:
+        users.set_status(target, "active" if action == "enable" else "disabled")
+    return RedirectResponse("/admin", status_code=303)

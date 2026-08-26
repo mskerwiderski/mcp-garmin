@@ -16,7 +16,11 @@ reached from the internet can hand out accounts:
 
     garmin-mcp invite create --label "Anja"
     garmin-mcp invite list
-    garmin-mcp user list | disable | enable | delete
+    garmin-mcp user list | disable | enable | promote | demote | delete
+
+The same things are on the web at /admin for accounts with the admin flag; the
+first account created on a server has it. The command line stays the way back
+in when nobody can log in.
 """
 
 from __future__ import annotations
@@ -146,15 +150,26 @@ def _user(args: argparse.Namespace) -> int:
             return 0
         print(f"{'id':>3}  {'e-mail':28} {'status':9} {'garmin':22} last seen")
         for r in rows:
-            print(f"{r['id']:>3}  {r['email']:28} {r['status']:9} "
+            status = r["status"] + ("*" if r["is_admin"] else "")
+            print(f"{r['id']:>3}  {r['email']:28} {status:9} "
                   f"{(r['garmin_account'] or '- not connected -'):22} "
                   f"{_fmt_ms(r['last_seen_ms'])}")
+        print("* = administrator")
         return 0
 
     user_id = users.user_id_by_email(args.email)
     if user_id is None:
         print(f"no account for {args.email}", file=sys.stderr)
         return 1
+    if args.user_cmd in ("promote", "demote"):
+        try:
+            users.set_admin(user_id, args.user_cmd == "promote")
+        except users.UserError as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
+        print(f"{args.email} is now "
+              f"{'an administrator' if args.user_cmd == 'promote' else 'a normal user'}")
+        return 0
     if args.user_cmd in ("disable", "enable"):
         users.set_status(user_id, "disabled" if args.user_cmd == "disable" else "active")
         print(f"{args.email} is now {'disabled' if args.user_cmd == 'disable' else 'active'}")
@@ -201,6 +216,8 @@ def main(argv: list[str] | None = None) -> int:
     user_sub.add_parser("list", help="all accounts")
     for name, helptext in (("disable", "block an account immediately"),
                            ("enable", "unblock an account"),
+                           ("promote", "give access to the admin page"),
+                           ("demote", "take away the admin page"),
                            ("delete", "remove an account and all its data")):
         sp = user_sub.add_parser(name, help=helptext)
         sp.add_argument("email")
