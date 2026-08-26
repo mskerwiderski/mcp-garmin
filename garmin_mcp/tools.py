@@ -223,10 +223,12 @@ def register(server: MCPServer, get_session=current_session) -> MCPServer:
     @_guard
     async def list_challenges(sport: str | None = None, limit: int = 10) -> list[dict]:
         """Social challenges against friends ("Lauf-Challenge" and the like),
-        newest first: name, period, how many players and where you ranked.
+        newest first, including the one running right now: name, period, state
+        (running/finished) and where you ranked.
 
-        sport filters on "running", "cycling" or "swimming". Take the
-        challenge_id from here and pass it to get_challenge for the table."""
+        sport filters on "running", "cycling" or "swimming". A running
+        challenge reports no player count here - take its challenge_id to
+        get_challenge, which returns the current table."""
         c = await S().client()
         rows = [project.challenge_summary(x) for x in await c.list_adhoc_challenges()]
         if sport:

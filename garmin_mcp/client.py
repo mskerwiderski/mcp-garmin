@@ -1598,16 +1598,31 @@ class GarminClient:
         return r.json() or {}
 
     async def list_adhoc_challenges(self) -> list[dict]:
-        """Social ("ad hoc") challenges - the ones you run against friends.
-        The endpoint is called `historical` but returns every challenge the
-        account ever joined, newest first, and ignores start/limit."""
-        r = await self._http.get(
-            f"{CONNECT_API}/adhocchallenge-service/adHocChallenge/historical",
-            headers=await self._bearer())
-        if r.status_code != 200:
-            raise GarminError(f"adhoc challenges HTTP {r.status_code}")
-        arr = r.json() or []
-        return arr if isinstance(arr, list) else []
+        """Social challenges against friends, newest first.
+
+        Two endpoints are needed. `historical` returns only FINISHED
+        challenges; the one running this month exists exclusively under
+        `active`. Asking only historical is why the current month looks like it
+        does not exist - which is how this was found.
+
+        `active` entries carry playerCount 0 and players []; the real numbers
+        come from get_adhoc_challenge.
+        """
+        found: dict[str, dict] = {}
+        for path in ("active", "historical"):
+            r = await self._http.get(
+                f"{CONNECT_API}/adhocchallenge-service/adHocChallenge/{path}",
+                headers=await self._bearer())
+            if r.status_code != 200:
+                if path == "historical":       # the finished ones are the bulk
+                    raise GarminError(f"adhoc challenges HTTP {r.status_code}")
+                continue
+            for item in (r.json() or []):
+                uuid = item.get("uuid")
+                if uuid and uuid not in found:
+                    found[uuid] = item
+        return sorted(found.values(), key=lambda i: i.get("startDate") or "",
+                      reverse=True)
 
     async def get_adhoc_challenge(self, uuid: str) -> dict:
         """One social challenge including its leaderboard (`players`). The

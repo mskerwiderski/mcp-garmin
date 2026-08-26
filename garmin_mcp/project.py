@@ -201,22 +201,37 @@ def profile(settings: dict, bio: dict, zones: list[dict]) -> dict:
 CHALLENGE_SPORT = {1: "running", 2: "cycling", 3: "swimming"}
 
 
+def _challenge_state(start: str, end: str) -> str:
+    """From the dates, not from socialChallengeStatusId - the numeric status is
+    undocumented, the dates are not."""
+    from datetime import date
+    today = date.today().isoformat()
+    if start and today < start:
+        return "upcoming"
+    return "running" if end and today <= end else "finished"
+
+
 def challenge_summary(c: dict) -> dict:
+    start, end = (c.get("startDate") or "")[:10], (c.get("endDate") or "")[:10]
     return compact({
         "challenge_id": c.get("uuid"),
         "name": c.get("adHocChallengeName"),
         "sport": CHALLENGE_SPORT.get(c.get("socialChallengeActivityTypeId")),
-        "start": (c.get("startDate") or "")[:10],
-        "end": (c.get("endDate") or "")[:10],
+        "state": _challenge_state(start, end),
+        "start": start,
+        "end": end,
         "my_rank": c.get("userRanking"),
-        "players": c.get("playerCount"),
+        # A running challenge reports 0 here; the real count comes with the
+        # leaderboard from get_challenge.
+        "players": c.get("playerCount") or None,
     })
 
 
 def challenge_detail(c: dict, my_display_name: str = "") -> dict:
     sport = CHALLENGE_SPORT.get(c.get("socialChallengeActivityTypeId"))
+    players = c.get("players") or []
     board = []
-    for p in sorted(c.get("players") or [], key=lambda p: p.get("ranking") or 999):
+    for p in sorted(players, key=lambda p: p.get("ranking") or 999):
         total = p.get("totalNumber")
         row = {"rank": p.get("ranking"), "name": p.get("fullName"),
                "total_km": _km(total) if sport else None,
@@ -224,4 +239,5 @@ def challenge_detail(c: dict, my_display_name: str = "") -> dict:
         if my_display_name and p.get("displayName") == my_display_name:
             row["is_you"] = True
         board.append(compact(row))
-    return compact({**challenge_summary(c), "leaderboard": board})
+    return compact({**challenge_summary(c), "players": len(players) or None,
+                    "leaderboard": board})
