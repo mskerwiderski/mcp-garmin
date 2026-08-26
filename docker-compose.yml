@@ -1,0 +1,21 @@
+# Standalone compose project. The container joins the external network the
+# reverse proxy already lives on, exactly like the other apps on the host - no
+# host port binding, Caddy proxies by container name.
+services:
+  mcp-garmin:
+    build: .
+    image: mcp-garmin:latest
+    container_name: mcp-garmin
+    restart: unless-stopped
+    env_file: ./.env
+    volumes:
+      - mcp_garmin_data:/data
+    networks:
+      - root_default
+
+networks:
+  root_default:
+    external: true
+
+volumes:
+  mcp_garmin_data:

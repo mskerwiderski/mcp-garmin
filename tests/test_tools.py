@@ -1,0 +1,243 @@
+"""Tools against a stubbed Garmin API: wiring plus the projections."""
+import asyncio
+import json
+
+import pytest
+
+from garmin_mcp.server import build_server
+
+ACTIVITY_ROW = {
+    "activityId": 4242, "activityName": "Morning Run",
+    "startTimeLocal": "2026-08-20 08:30:00", "activityType": {"typeKey": "running"},
+    "distance": 12345.6, "duration": 3600.0, "movingDuration": 3500.0,
+    "averageHR": 142.4, "maxHR": 171.0, "calories": 812.0, "elevationGain": 118.0,
+    "averageSpeed": 3.43, "ownerId": 7, "privacy": {"typeKey": "private"},
+}
+
+ACTIVITY_DETAIL = {
+    "activityId": 4242, "activityName": "Morning Run", "description": "easy",
+    "activityTypeDTO": {"typeKey": "running"},
+    "eventTypeDTO": {"typeKey": "training"},
+    "summaryDTO": {"startTimeLocal": "2026-08-20 08:30:00", "distance": 12345.6,
+                   "duration": 3600.0, "movingDuration": 3500.0, "averageHR": 142.4,
+                   "maxHR": 171, "averagePower": 244, "normPower": 251,
+                   "elevationGain": 118, "calories": 812, "trainingEffect": 3.4},
+    "metadataDTO": {"elevationCorrected": False},
+    "gear": [{"displayName": "Nimbus 26"}],
+    "summarizedDiveInfo": {"summarizedDiveGases": []},
+}
+
+
+class FakeClient:
+    def __init__(self, fit: bytes) -> None:
+        self._fit = fit
+        self.calls = []
+
+    async def search_activities(self, **kw):
+        self.calls.append(("search", kw))
+        return [ACTIVITY_ROW]
+
+    async def get_activity_detail(self, activity_id):
+        return ACTIVITY_DETAIL
+
+    async def download_original_fit(self, activity_id):
+        return self._fit if activity_id == 4242 else None
+
+    async def get_daily_summary(self, display, day):
+        return {"totalSteps": 9123, "restingHeartRate": 44, "averageStressLevel": 28,
+                "bodyBatteryHighestValue": 92, "bodyBatteryLowestValue": 21,
+                "totalKilocalories": 2890, "userProfileId": 7}
+
+    async def get_sleep_full(self, display, day):
+        return {"dailySleepDTO": {"sleepTimeSeconds": 27000, "deepSleepSeconds": 4800,
+                                  "lightSleepSeconds": 15000, "remSleepSeconds": 6000,
+                                  "awakeSleepSeconds": 1200,
+                                  "sleepScores": {"overall": {"value": 78,
+                                                              "qualifierKey": "GOOD"}}}}
+
+    async def get_hrv_summary(self, day):
+        return {"lastNightAvg": 61, "status": "BALANCED",
+                "baseline": {"lowUpper": 48, "balancedUpper": 72}}
+
+    async def get_training_readiness(self, day):
+        return [{"score": 71, "level": "READY", "inputContext": "AFTER_WAKEUP_RESET",
+                 "feedbackShort": "GOOD", "sleepScore": 78, "recoveryTime": 240}]
+
+    async def get_training_status(self, day):
+        return {"mostRecentVO2Max": {"generic": {"vo2MaxPreciseValue": 54.2}}}
+
+    async def get_body_composition(self, start, end):
+        return [{"calendarDate": "2026-08-20", "weight": 74300, "bodyFat": 12.4,
+                 "muscleMass": 33100}]
+
+    async def get_blood_pressure(self, start, end):
+        return {"measurementSummaries": [{"measurements": [
+            {"measurementTimestampLocal": "2026-08-20T07:00:00.0",
+             "systolic": 118, "diastolic": 74, "pulse": 52}]}]}
+
+    async def list_gear(self, statuses="ACTIVE"):
+        return [{"uuid": "u1", "name": "Nimbus 26", "gearType": "SHOES",
+                 "brand": "Asics", "status": "ACTIVE", "distanceUsedMeters": 412000,
+                 "maxUsageDistanceMeters": 800000}]
+
+    async def user_settings(self):
+        return {"birthDate": "1975-01-01", "gender": "MALE", "weight": 74300,
+                "height": 183}
+
+    async def personal_information(self):
+        return {"vo2Max": 54.2, "functionalThresholdPower": 265,
+                "criticalSwimSpeed": 1180}
+
+    async def heart_rate_zones(self):
+        return [{"sport": "RUNNING", "maxHeartRateUsed": 186, "zone1Floor": 110,
+                 "zone2Floor": 130, "zone3Floor": 145, "zone4Floor": 160,
+                 "zone5Floor": 172}]
+
+    async def fetch_display_name(self):
+        return "Test Athlete"
+
+
+class FakeSession:
+    def __init__(self, fit: bytes) -> None:
+        self._client = FakeClient(fit)
+        self.client_stub = self._client
+        self.account = "Test Athlete"
+
+    async def client(self):
+        return self._client
+
+    async def display_id(self):
+        return "display-guid"
+
+    async def fit_bytes(self, activity_id):
+        return await self._client.download_original_fit(activity_id)
+
+
+@pytest.fixture
+def session(fit_bytes):
+    return FakeSession(fit_bytes)
+
+
+@pytest.fixture
+def server(session):
+    srv, _ = build_server(session)
+    return srv
+
+
+def _blocks(server, name, args):
+    res = asyncio.run(server.call_tool(name, args))
+    return [json.loads(c.text) for c in res.content]
+
+
+def call(server, name, **args):
+    """A tool returning one object."""
+    blocks = _blocks(server, name, args)
+    assert len(blocks) == 1
+    return blocks[0]
+
+
+def call_list(server, name, **args):
+    """A tool returning a list - one content block per item."""
+    return _blocks(server, name, args)
+
+
+def test_all_tools_are_registered(server):
+    names = {t.name for t in asyncio.run(server.list_tools())}
+    assert names == {
+        "list_activities", "get_activity", "analyze_activity_fit",
+        "get_activity_streams", "get_swim_detail", "get_activity_sensors",
+        "get_daily_health", "get_training_status", "get_body_composition",
+        "get_blood_pressure", "list_gear", "get_profile", "whoami"}
+
+
+def test_every_tool_has_a_description(server):
+    for tool in asyncio.run(server.list_tools()):
+        assert tool.description and len(tool.description) > 60, tool.name
+
+
+def test_list_activities_projects_the_row(server):
+    rows = call_list(server, "list_activities", sport="running")
+    assert rows == [{"activity_id": 4242, "name": "Morning Run",
+                     "start_local": "2026-08-20 08:30:00", "sport": "running",
+                     "distance_km": 12.346, "duration_min": 60.0,
+                     "moving_min": 58.3, "avg_hr": 142, "max_hr": 171,
+                     "avg_speed_ms": 3.43, "elevation_gain_m": 118,
+                     "calories": 812}]
+
+
+def test_list_activities_caps_the_limit(server, session):
+    call_list(server, "list_activities", limit=5000)
+    assert session.client_stub.calls[-1][1]["limit"] == 100
+
+
+def test_list_activities_passes_filters_through(server, session):
+    call_list(server, "list_activities", date_from="2026-08-01",
+              date_to="2026-08-20", sport="cycling", limit=7)
+    _, kw = session.client_stub.calls[-1]
+    assert kw == {"limit": 7, "start_date": "2026-08-01", "end_date": "2026-08-20",
+                  "activity_type": "cycling"}
+
+
+def test_get_activity_drops_garmin_noise(server):
+    a = call(server, "get_activity", activity_id=4242)
+    assert a["name"] == "Morning Run" and a["gear"] == ["Nimbus 26"]
+    assert a["normalized_power"] == 251
+    assert "summarizedDiveInfo" not in a and "metadataDTO" not in a
+
+
+def test_analyze_activity_fit_reads_the_file(server):
+    m = call(server, "analyze_activity_fit", activity_id=4242)
+    assert m["sport"] == "running" and m["avg_hr"] == 139
+
+
+def test_missing_fit_is_a_clear_error(server):
+    with pytest.raises(Exception) as exc:
+        call(server, "analyze_activity_fit", activity_id=999)
+    assert "no FIT original" in str(exc.value.__cause__)
+
+
+def test_streams_stay_small(server):
+    view = call(server, "get_activity_streams", activity_id=4242, max_points=30)
+    assert view["n_points"] == 30
+    assert len(json.dumps(view)) < 20_000
+
+
+def test_daily_health_merges_four_endpoints(server):
+    d = call(server, "get_daily_health", day="2026-08-20")
+    assert d["steps"] == 9123 and d["resting_hr"] == 44
+    assert d["sleep"]["score"] == 78 and d["sleep"]["deep_min"] == 80.0
+    assert d["hrv_last_night"] == 61 and d["hrv_status"] == "BALANCED"
+    assert d["training_readiness"]["score"] == 71
+    assert d["training_readiness"]["is_morning_value"] is True
+
+
+def test_body_composition_is_in_kilograms(server):
+    rows = call_list(server, "get_body_composition", date_from="2026-08-01",
+                     date_to="2026-08-20")
+    assert rows[0]["weight_kg"] == 74.3 and rows[0]["muscle_mass_kg"] == 33.1
+
+
+def test_blood_pressure_is_flattened(server):
+    rows = call_list(server, "get_blood_pressure", date_from="2026-08-01",
+                     date_to="2026-08-20")
+    assert rows == [{"measured_at": "2026-08-20T07:00:00.0", "systolic": 118,
+                     "diastolic": 74, "pulse": 52}]
+
+
+def test_profile_converts_units(server):
+    p = call(server, "get_profile")
+    assert p["weight_kg"] == 74.3
+    assert p["critical_swim_speed_ms"] == 1.18
+    assert p["hr_zones"][0]["floors"] == [110, 130, 145, 160, 172]
+
+
+def test_gear_uses_the_v2_field_names(server):
+    g = call_list(server, "list_gear")
+    assert g[0] == {"uuid": "u1", "name": "Nimbus 26", "type": "SHOES",
+                    "brand": "Asics", "status": "ACTIVE", "used_km": 412.0,
+                    "limit_km": 800.0}
+
+
+def test_bad_day_is_rejected(server):
+    with pytest.raises(Exception):
+        call(server, "get_daily_health", day="20th of August")

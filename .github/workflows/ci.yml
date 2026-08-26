@@ -1,0 +1,52 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]" ruff
+      - name: Lint
+        run: |
+          ruff check --select E9,F garmin_mcp tests | tee ruff.log
+          echo "ruff checked $(find garmin_mcp tests -name '*.py' | wc -l) files"
+      - name: Tests
+        run: pytest -v | tee pytest.log
+      - name: Fail on an empty test run
+        run: grep -qE "[0-9]+ passed" pytest.log
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t mcp-garmin:ci . | tee build.log
+      - name: Smoke test the image
+        run: |
+          docker run --rm mcp-garmin:ci garmin-mcp --help
+          docker run --rm mcp-garmin:ci garmin-mcp status || true
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
