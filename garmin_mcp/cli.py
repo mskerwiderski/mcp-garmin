@@ -19,7 +19,7 @@ import getpass
 import sys
 
 from . import tokens as token_store
-from .client import GarminAuthError, GarminClient, LoginState
+from .client import GarminClient, GarminError, LoginState
 
 
 async def _login() -> int:
@@ -42,7 +42,7 @@ async def _login() -> int:
         print("The OAuth1 token is valid for about a year; the server refreshes "
               "OAuth2 from it without touching Garmin's login.")
         return 0
-    except GarminAuthError as exc:
+    except GarminError as exc:
         print(f"login failed: {exc}", file=sys.stderr)
         print("If this says 429/403 or mentions Cloudflare: you are probably on a "
               "VPN or datacenter IP. Retry from a normal home connection.",

@@ -1,0 +1,8 @@
+# Replace the hostname; Caddy gets the certificate on its own.
+# Port 80 must be reachable from the internet for that, which on an Oracle
+# Ubuntu image means opening it in the VCN security list AND in the instance's
+# own iptables (see README).
+mcp-garmin.example.com {
+    reverse_proxy mcp-garmin:8000
+    encode gzip
+}
