@@ -20,8 +20,11 @@ instead: [install-claude.md](install-claude.md).
 
 Open the invitation link you were given
 (`https://mcp.example.com/signup?code=...`). It works once and expires after
-seven days. No link yet? See [guest access](guest-access.md). Choose an e-mail address and a
-password of at least ten characters.
+seven days. Choose an e-mail address and a password of at least ten characters.
+
+No link yet? See [guest access](guest-access.md) - open access is planned, and
+until then [hosting your own instance](self-hosting.md) is the way that needs
+nobody else.
 
 ## 2. Connect Garmin
 

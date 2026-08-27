@@ -7,25 +7,31 @@ connector to Claude or ChatGPT.
 This is also the **only** route that works with claude.ai in the browser and
 with ChatGPT, because neither of them can start a program on your computer.
 
-If you would rather keep everything on your own machine, see
-[install-claude.md](install-claude.md) for the local route, or
-[self-hosting.md](self-hosting.md) to run your own server.
+Since open guest access is still being prepared, the two routes you can take
+today without waiting for anyone are the local one in
+[install-claude.md](install-claude.md) and your own server in
+[self-hosting.md](self-hosting.md) - same software, same tools.
 
 ---
 
-## 1. Ask for an invitation
+## 1. Get an invitation
 
-Send a short mail to **michael@skerwiderski.de**. Registration is invite-only,
-so there is no signup page to find - without a valid code, `/signup` simply
-returns 404.
+**Open guest access is planned but not available yet.** Right now the instance
+runs with a small group of testers who were invited personally, so the way in is
+to be handed a link by whoever operates it.
 
-You get a link back that looks like this:
+Registration is invite-only by design: there is no signup page to find, and
+without a valid code `/signup` returns 404 rather than a form.
+
+An invitation link looks like this:
 
 ```
-https://mcp.garmin.skerwiderski.cloud/signup?code=...
+https://mcp.example.com/signup?code=...
 ```
 
-It works **once** and expires after **seven days**.
+It works **once** and expires after **seven days**. The host name in the link is
+the instance you were invited to - use it everywhere this guide says
+`mcp.example.com`.
 
 ## 2. Create your account
 
@@ -88,7 +94,7 @@ Short version: **Settings → Connectors → Create**, paste the URL, authentica
 Both can talk to a remote server too:
 
 ```bash
-claude mcp add --transport http garmin https://mcp.garmin.skerwiderski.cloud/mcp
+claude mcp add --transport http garmin https://mcp.example.com/mcp
 ```
 
 Then run `/mcp` in a session to complete the login. In Claude Desktop, add the

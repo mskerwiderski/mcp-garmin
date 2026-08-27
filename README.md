@@ -21,22 +21,22 @@ It never writes to Garmin Connect. Every tool is read-only.
 
 | | **1. Guest access** | **2. Local** | **3. Your own server** |
 |---|---|---|---|
+| Status | invitation only, **open access planned** | available | available |
 | You need | an invitation | Python 3.12 | a server, a domain, Docker |
 | You run | nothing | the server on your machine | the server for you and your friends |
 | Works with | claude.ai, ChatGPT, Claude Desktop, Claude Code | Claude Desktop, Claude Code | everything |
 | Setup | 5 minutes | 2 minutes | 20 minutes |
-| Your data lives | on Michael's server | only on your machine | on your server |
+| Your data lives | on the instance that invited you | only on your machine | on your server |
 | Guide | [Guest access](docs/guest-access.md) | [below](#quickstart-local) | [Self-hosting](docs/self-hosting.md) |
 
-**1. Guest access** - the fastest way, and the only one that needs no
-infrastructure at all. Ask for an invitation, create an account, connect your
-Garmin, done. This is also the only route that works with **claude.ai in the
-browser and with ChatGPT**, since neither can start a program on your computer.
+**1. Guest access** - the only route that needs no infrastructure at all: open
+the invitation link, create an account, connect your Garmin, done. Like route 3,
+it works with **claude.ai in the browser and with ChatGPT** - route 2 cannot,
+because neither of those can start a program on your computer.
 
-> Want an invitation? Send a short mail to **michael@skerwiderski.de**. You get
-> a one-time signup link. Your Garmin tokens are stored encrypted, nobody else
-> can see your data, and you can delete your account with everything in it at
-> any time, yourself, with one button.
+> **Guest access is not open yet.** It currently runs with a small group of
+> testers, by personal invitation. A public way to request an invitation is
+> planned - until then, routes 2 and 3 are ready to use today.
 
 **2. Local** - nothing leaves your machine, no accounts, no server. Your AI
 client starts the process when it needs it. Best if you use Claude Desktop or

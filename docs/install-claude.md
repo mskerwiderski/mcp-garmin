@@ -127,7 +127,7 @@ instance, [run your own](self-hosting.md), or use one a friend runs.
 
 1. Open the invitation link you were given. It looks like
    `https://mcp.example.com/signup?code=...`, works once and expires after seven
-   days. No link yet? See [guest access](guest-access.md).
+   days. No link yet? See [guest access](guest-access.md) - open access is planned.
 2. Create your account with an e-mail address and a password of at least ten
    characters.
 3. On your account page, click **Connect Garmin** and enter your Garmin
