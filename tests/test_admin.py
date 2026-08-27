@@ -73,10 +73,12 @@ def test_the_invitation_comes_with_a_ready_made_mail(client, user_id, monkeypatc
     # The address must stand on its own line in both texts, not trail off the
     # end of a sentence - "which URL exactly?" is the question that follows.
     assert page.count("    https://mcp.garmin.example/mcp") >= 2
-    assert "including the /mcp at the end" in page
-    assert "mit dem /mcp am Ende" in page
-    assert "no API key, no token, no port" in page
-    assert "never stored" in page and "nicht gespeichert" in page
+    # Wrapping may break any phrase across lines, so compare without it.
+    flat = " ".join(page.split())
+    assert "including the /mcp at the end" in flat
+    assert "mit dem /mcp am Ende" in flat
+    assert "no API key, no token, no port" in flat
+    assert "never stored" in flat and "nicht gespeichert" in flat
     assert "expires in 7 days" in page and "7 Tagen ab" in page
 
     # And a prefilled mail draft for the client that opens one.
@@ -207,3 +209,35 @@ def test_cli_invite_list_prints_the_full_code(capsys, user_id):
     code = users.create_invite("Anja")
     main(["invite", "list"])
     assert code in capsys.readouterr().out       # truncated codes cannot be deleted
+
+
+def test_the_mail_text_is_wrapped_after_the_link_is_inserted():
+    """The template cannot be wrapped in the source: a real host name is much
+    longer than the placeholder, which left 100-character lines next to
+    50-character ones."""
+    from garmin_mcp.web import WRAP_AT, invitation_mail
+    long_host = "https://mcp.garmin.a-rather-long-hostname.example"
+    for german in (False, True):
+        _, body = invitation_mail(f"{long_host}/signup?code={'x' * 32}",
+                                  long_host, german)
+        for line in body.split("\n"):
+            if "://" in line:
+                assert line.strip().startswith("http")     # never broken up
+                continue
+            assert len(line) <= WRAP_AT, line
+
+
+def test_urls_survive_wrapping_unbroken():
+    from garmin_mcp.web import invitation_mail
+    link = "https://mcp.example.com/signup?code=" + "y" * 40
+    _, body = invitation_mail(link, "https://mcp.example.com")
+    assert link in body                     # not split across two lines
+    assert "https://mcp.example.com/mcp" in body
+
+
+def test_the_german_text_uses_real_umlauts():
+    from garmin_mcp.web import invitation_mail
+    _, body = invitation_mail("https://x.example/signup?code=1", "https://x.example",
+                              german=True)
+    assert "persönliche" in body and "löschen" in body
+    assert "persoenliche" not in body and "loeschen" not in body

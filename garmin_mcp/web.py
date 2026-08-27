@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import html as html_lib
 import os
+import textwrap
 import urllib.parse
 
 from starlette.requests import Request
@@ -331,90 +332,98 @@ async def post_garmin_disconnect(request: Request) -> Response:
 MAIL_SUBJECT_EN = "Your access to my Garmin connector"
 MAIL_SUBJECT_DE = "Dein Zugang zu meinem Garmin-Connector"
 
+# Written as one line per paragraph on purpose: the wrapping happens after the
+# host name and the link have been substituted. Wrapping the template instead
+# produced 100-character lines next to 50-character ones, because a real host
+# name is nothing like the placeholder it replaces.
 MAIL_EN = """Hi,
 
-here is your personal invitation to {host} - a small server that lets Claude or
-ChatGPT answer questions about your own Garmin data. It only reads: it can
-never change or delete anything in your Garmin account.
+here is your personal invitation to {host} - a small server that lets Claude or ChatGPT answer questions about your own Garmin data. It only reads: it can never change or delete anything in your Garmin account.
 
 Three steps:
 
 1. Open this link. It works once and expires in 7 days:
    {link}
-   Pick an e-mail address and a password. That is your login for the connector,
-   not your Garmin login.
+   Pick an e-mail address and a password. That is your login for the connector, not your Garmin login.
 
-2. On your account page, click "Connect Garmin" and enter your Garmin e-mail
-   and password (plus your code if you use two-factor). Your Garmin password is
-   used once to obtain an access token and is never stored.
+2. On your account page, click "Connect Garmin" and enter your Garmin e-mail and password (plus your code if you use two-factor). Your Garmin password is used once to obtain an access token and is never stored.
 
-3. Add the connector in Claude or ChatGPT. Whatever you use, the address to
-   enter is this one - copy it exactly, including the /mcp at the end:
+3. Add the connector in Claude or ChatGPT. Whatever you use, the address to enter is this one - copy it exactly, including the /mcp at the end:
 
        {mcp_url}
 
-   - claude.ai: Settings > Connectors > Add custom connector, paste the
-     address, save. You will be sent back here to log in and confirm.
-   - ChatGPT: Settings > Connectors > Create (needs developer mode, under
-     Settings > Connectors > Advanced), paste the same address, set
-     authentication to "OAuth".
+   - claude.ai: Settings > Connectors > Add custom connector, paste the address, save. You will be sent back here to log in and confirm.
+   - ChatGPT: Settings > Connectors > Create (needs developer mode, under Settings > Connectors > Advanced), paste the same address, set authentication to "OAuth".
    - Claude Desktop works too: Settings > Connectors, same address.
 
    There is nothing else to fill in - no API key, no token, no port.
 
-Then just ask, for example: "What were my last three activities?" or
-"Why is my training readiness so low today?"
+Then just ask, for example: "What were my last three activities?" or "Why is my training readiness so low today?"
 
-You can delete your account, your tokens and all cached data at any time with
-one button on your account page.
+You can delete your account, your tokens and all cached data at any time with one button on your account page.
 
-Step-by-step guide with screenshots of every setting:
+Step by step, with every setting spelled out:
 https://github.com/mskerwiderski/mcp-garmin/blob/main/docs/guest-access.md
 """
 
 MAIL_DE = """Hallo,
 
-hier ist deine persoenliche Einladung fuer {host} - einen kleinen Server, mit
-dem Claude oder ChatGPT Fragen zu deinen eigenen Garmin-Daten beantworten
-koennen. Er liest nur: er kann in deinem Garmin-Konto nichts aendern oder
-loeschen.
+hier ist deine persönliche Einladung für {host} - einen kleinen Server, mit dem Claude oder ChatGPT Fragen zu deinen eigenen Garmin-Daten beantworten können. Er liest nur: er kann in deinem Garmin-Konto nichts ändern oder löschen.
 
 Drei Schritte:
 
-1. Oeffne diesen Link. Er funktioniert einmal und laeuft in 7 Tagen ab:
+1. Öffne diesen Link. Er funktioniert einmal und läuft in 7 Tagen ab:
    {link}
-   Waehle eine E-Mail-Adresse und ein Passwort. Das ist dein Login fuer den
-   Connector, nicht dein Garmin-Login.
+   Wähle eine E-Mail-Adresse und ein Passwort. Das ist dein Login für den Connector, nicht dein Garmin-Login.
 
-2. Klicke auf deiner Kontoseite auf "Connect Garmin" und gib deine
-   Garmin-Adresse und dein Garmin-Passwort ein (plus Code, falls du
-   Zwei-Faktor nutzt). Dein Garmin-Passwort wird einmal verwendet, um ein
-   Zugriffstoken zu holen, und nicht gespeichert.
+2. Klicke auf deiner Kontoseite auf "Connect Garmin" und gib deine Garmin-Adresse und dein Garmin-Passwort ein (plus Code, falls du Zwei-Faktor nutzt). Dein Garmin-Passwort wird einmal verwendet, um ein Zugriffstoken zu holen, und nicht gespeichert.
 
-3. Trage den Connector in Claude oder ChatGPT ein. Egal womit du arbeitest,
-   einzutragen ist immer diese Adresse - genau so, mit dem /mcp am Ende:
+3. Trage den Connector in Claude oder ChatGPT ein. Egal womit du arbeitest, einzutragen ist immer diese Adresse - genau so, mit dem /mcp am Ende:
 
        {mcp_url}
 
-   - claude.ai: Einstellungen > Connectors > Custom Connector hinzufuegen,
-     Adresse einfuegen, speichern. Du wirst danach hierher zurueckgeschickt,
-     loggst dich ein und bestaetigst den Zugriff.
-   - ChatGPT: Einstellungen > Connectors > Create (braucht Developer Mode,
-     unter Einstellungen > Connectors > Advanced), dieselbe Adresse einfuegen,
-     Authentifizierung auf "OAuth" stellen.
+   - claude.ai: Einstellungen > Connectors > Custom Connector hinzufügen, Adresse einfügen, speichern. Du wirst hierher zurückgeschickt, loggst dich ein und bestätigst den Zugriff.
+   - ChatGPT: Einstellungen > Connectors > Create (braucht Developer Mode, unter Einstellungen > Connectors > Advanced), dieselbe Adresse einfügen, Authentifizierung auf "OAuth" stellen.
    - Claude Desktop geht auch: Einstellungen > Connectors, gleiche Adresse.
 
-   Mehr ist nicht auszufuellen - kein API-Key, kein Token, kein Port.
+   Mehr ist nicht auszufüllen - kein API-Key, kein Token, kein Port.
 
-Dann einfach fragen, zum Beispiel: "Zeig mir meine letzten drei Aktivitaeten"
-oder "Warum ist meine Training Readiness heute so niedrig?"
+Dann einfach fragen, zum Beispiel: "Zeig mir meine letzten drei Aktivitäten" oder "Warum ist meine Training Readiness heute so niedrig?"
 
-Du kannst dein Konto, deine Tokens und alle zwischengespeicherten Daten
-jederzeit mit einem Knopf auf deiner Kontoseite loeschen.
+Du kannst dein Konto, deine Tokens und alle zwischengespeicherten Daten jederzeit mit einem Knopf auf deiner Kontoseite löschen.
 
-Schritt fuer Schritt erklaert:
+Schritt für Schritt erklärt:
 https://github.com/mskerwiderski/mcp-garmin/blob/main/docs/guest-access.md
 """
+
+WRAP_AT = 72
+
+
+def _wrap_mail(text: str) -> str:
+    """Wrap prose to a readable width, leave URLs and commands alone.
+
+    Lines that carry an address must survive untouched - a broken URL is worse
+    than a long line, and mail clients turn only unbroken ones into links.
+    """
+    out: list[str] = []
+    for line in text.split("\n"):
+        body = line.strip()
+        if not body:
+            out.append("")
+            continue
+        indent = " " * (len(line) - len(line.lstrip()))
+        if "://" in body:
+            out.append(line.rstrip())
+            continue
+        if body.startswith("- "):
+            hanging = indent + "  "
+        elif len(body) > 2 and body[0].isdigit() and body[1:3] == ". ":
+            hanging = indent + "   "
+        else:
+            hanging = indent
+        out.extend(textwrap.wrap(body, WRAP_AT, initial_indent=indent,
+                                 subsequent_indent=hanging))
+    return "\n".join(out)
 
 
 def invitation_mail(link: str, base: str, german: bool = False) -> tuple[str, str]:
@@ -422,7 +431,8 @@ def invitation_mail(link: str, base: str, german: bool = False) -> tuple[str, st
     host = base.split("://", 1)[-1]
     template = MAIL_DE if german else MAIL_EN
     subject = MAIL_SUBJECT_DE if german else MAIL_SUBJECT_EN
-    return subject, template.format(host=host, link=link, mcp_url=f"{base}/mcp")
+    filled = template.format(host=host, link=link, mcp_url=f"{base}/mcp")
+    return subject, _wrap_mail(filled)
 
 
 def _mail_block(title: str, subject: str, body: str, ident: str) -> str:
