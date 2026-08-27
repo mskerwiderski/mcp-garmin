@@ -1,7 +1,7 @@
 # Usage examples
 
-All examples below are made up but structurally real: the field names and units
-are exactly what the tools return.
+All numbers below are invented. The field names, units and response shapes are
+exactly what the tools return - the values are not anybody's real data.
 
 ## Activities
 
@@ -12,7 +12,7 @@ row per activity:
 
 ```json
 {
-  "activity_id": 24114943735,
+  "activity_id": 19876543210,
   "name": "Morning Run",
   "start_local": "2026-08-25 07:12:04",
   "sport": "running",
@@ -41,7 +41,7 @@ Sport keys are Garmin's own: `running`, `cycling`, `lap_swimming`,
 
 ## One activity in depth
 
-> **Tell me everything about activity 24114943735.**
+> **Tell me everything about activity 19876543210.**
 
 `get_activity` returns Garmin's own record: names, times, averages, training
 effect, elevation, assigned gear.
@@ -141,31 +141,31 @@ the fast 50s?".
 
 ```json
 {
-  "day": "2026-08-25",
-  "steps": 6160,
-  "resting_hr": 48,
-  "stress_avg": 25,
-  "body_battery_high": 51,
-  "body_battery_low": 5,
+  "day": "2026-05-14",
+  "steps": 8420,
+  "resting_hr": 52,
+  "stress_avg": 31,
+  "body_battery_high": 88,
+  "body_battery_low": 24,
   "sleep": {
-    "sleep_h": 7.02,
-    "deep_min": 93.0,
-    "light_min": 262.0,
-    "rem_min": 66.0,
-    "awake_min": 26.0,
-    "score": 79,
-    "score_label": "FAIR"
+    "sleep_h": 7.4,
+    "deep_min": 74.0,
+    "light_min": 288.0,
+    "rem_min": 82.0,
+    "awake_min": 18.0,
+    "score": 81,
+    "score_label": "GOOD"
   },
-  "hrv_last_night": 26,
+  "hrv_last_night": 44,
   "hrv_status": "BALANCED",
-  "hrv_baseline_low": 25,
-  "hrv_baseline_high": 33,
+  "hrv_baseline_low": 38,
+  "hrv_baseline_high": 51,
   "training_readiness": {
-    "score": 2,
-    "level": "POOR",
+    "score": 23,
+    "level": "LOW",
     "feedback": "LET_YOUR_BODY_RECOVER",
-    "recovery_time_h": 60.8,
-    "acute_load": 821,
+    "recovery_time_h": 38.5,
+    "acute_load": 640,
     "is_morning_value": true
   }
 }
@@ -194,10 +194,10 @@ More:
 
 ```json
 [
-  {"day": "2026-08-20", "steps": 11429, "step_goal": 10000, "distance_km": 9.099,
-   "body_battery_charged": 52, "body_battery_drained": 47},
-  {"day": "2026-08-21", "steps": 16416, "distance_km": 14.831,
-   "body_battery_charged": 48, "body_battery_drained": 50, "vo2max_running": 50.9}
+  {"day": "2026-05-12", "steps": 9140, "step_goal": 10000, "distance_km": 7.2,
+   "body_battery_charged": 61, "body_battery_drained": 44},
+  {"day": "2026-05-13", "steps": 14380, "distance_km": 12.6,
+   "body_battery_charged": 49, "body_battery_drained": 58, "vo2max_running": 47.2}
 ]
 ```
 
@@ -218,9 +218,9 @@ events such as races:
 [
   {"type": "workout", "id": 77, "title": "4x1000m", "date": "2026-09-02",
    "sport": "running", "planned_duration_min": 60.0, "training_plan_id": 42},
-  {"type": "event", "id": 28616365, "title": "IRONMAN Vichy", "date": "2026-08-23",
-   "start_time": "07:00", "timezone": "Europe/Paris", "is_race": true,
-   "target": "226.0 kilometer"}
+  {"type": "event", "id": 30112233, "title": "City Marathon", "date": "2026-10-11",
+   "start_time": "09:00", "timezone": "Europe/Berlin", "is_race": true,
+   "target": "42.195 kilometer"}
 ]
 ```
 
@@ -236,11 +236,11 @@ adds the written content of a session - the intervals, the rests, the notes.
 
 ```json
 {
-  "race_predictions": {"5k": "22:54", "10k": "48:25",
-                       "half_marathon": "1:47:53", "marathon": "3:54:39"},
-  "fitness_age": 49.0, "chronological_age": 58, "achievable_fitness_age": 50.7,
-  "endurance_score": 7497, "hill_score": 38, "vo2max": 50.5,
-  "lifetime": {"activities": 6607, "distance_km": 129757.9, "hours": 7111}
+  "race_predictions": {"5k": "21:30", "10k": "44:50",
+                       "half_marathon": "1:39:20", "marathon": "3:28:00"},
+  "fitness_age": 38.0, "chronological_age": 44, "achievable_fitness_age": 36.5,
+  "endurance_score": 6120, "hill_score": 45, "vo2max": 47.2,
+  "lifetime": {"activities": 1840, "distance_km": 28430.5, "hours": 1620}
 }
 ```
 
