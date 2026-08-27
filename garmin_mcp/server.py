@@ -145,6 +145,8 @@ def build_http_app() -> Starlette:
                   methods=["POST"]),
             Route("/admin", web.get_admin),
             Route("/admin/invite", web.post_admin_invite, methods=["POST"]),
+            Route("/admin/invite/delete", web.post_admin_invite_delete,
+                  methods=["POST"]),
             Route("/admin/user/{user_id:int}/{action}", web.post_admin_user,
                   methods=["POST"]),
             # OAuth discovery (RFC 8414 + RFC 9728)

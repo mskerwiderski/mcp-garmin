@@ -125,6 +125,12 @@ a copy button and a draft your mail client can open. The text explains the three
 steps the recipient has to take and answers the question everyone asks first:
 the Garmin password is used once and never stored.
 
+The invitation list on that page shows every invitation with its state, and an
+open one shows its link again so you can re-send it without creating a second.
+**delete** next to it revokes an open invitation - the link stops working
+immediately - or drops the record of a used one, which does not touch the
+account it created.
+
 The same from the command line, which gives you the bare link:
 
 ```bash

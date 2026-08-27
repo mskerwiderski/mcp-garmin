@@ -46,6 +46,13 @@ def invite_valid(code: str) -> bool:
     return bool(row) and row["used_at_ms"] is None and row["expires_at_ms"] > now_ms()
 
 
+def delete_invite(code: str) -> bool:
+    """Deleting an unused invitation revokes its link immediately. Deleting a
+    used one only drops the record - the account it created stays."""
+    with conn() as c:
+        return c.execute("DELETE FROM invites WHERE code=?", (code,)).rowcount > 0
+
+
 def list_invites() -> list[dict]:
     with conn() as c:
         rows = c.execute("SELECT * FROM invites ORDER BY created_at_ms DESC").fetchall()

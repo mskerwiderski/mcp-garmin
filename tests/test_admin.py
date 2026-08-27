@@ -163,3 +163,47 @@ def test_migration_promotes_the_oldest_account_of_an_older_database(user_id):
         c.execute("UPDATE users SET is_admin=0")
     db.init()
     assert users.is_admin(user_id)
+
+
+def test_open_invitations_can_be_revoked_from_the_page(client, user_id, monkeypatch):
+    monkeypatch.setenv("PUBLIC_URL", "https://mcp.garmin.example")
+    _login(client)
+    code = users.create_invite("Anja")
+    page = client.get("/admin").text
+    # An open invitation shows its link again, so it can be re-sent.
+    assert f"https://mcp.garmin.example/signup?code={code}" in page
+    assert "Revoke this invitation" in page
+
+    client.post("/admin/invite/delete", data={"code": code})
+    assert not users.invite_valid(code)
+    assert code not in client.get("/admin").text
+
+
+def test_deleting_a_used_invitation_keeps_the_account(client, user_id):
+    _login(client)
+    code = users.create_invite("Bob")
+    other = users.create_user("bob@example.com", "anotherlongpw", code)
+    client.post("/admin/invite/delete", data={"code": code})
+    assert code not in [i["code"] for i in users.list_invites()]
+    assert users.get_user(other) is not None       # the account it created stays
+
+
+def test_a_normal_user_cannot_delete_invitations(client, user_id):
+    code = users.create_invite("Anja")
+    users.create_user("bob@example.com", "anotherlongpw", users.create_invite())
+    _login(client, "bob@example.com", "anotherlongpw")
+    assert client.post("/admin/invite/delete", data={"code": code}).status_code == 404
+    assert users.invite_valid(code)
+
+
+def test_cli_invite_delete(capsys, user_id):
+    code = users.create_invite("Anja")
+    assert main(["invite", "delete", code]) == 0
+    assert not users.invite_valid(code)
+    assert main(["invite", "delete", "no-such-code"]) == 1
+
+
+def test_cli_invite_list_prints_the_full_code(capsys, user_id):
+    code = users.create_invite("Anja")
+    main(["invite", "list"])
+    assert code in capsys.readouterr().out       # truncated codes cannot be deleted

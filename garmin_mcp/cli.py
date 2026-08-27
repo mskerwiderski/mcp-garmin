@@ -15,7 +15,7 @@ interface on purpose - an invitation is one command, and nothing that can be
 reached from the internet can hand out accounts:
 
     garmin-mcp invite create --label "Anja"
-    garmin-mcp invite list
+    garmin-mcp invite list | delete <code>
     garmin-mcp user list | disable | enable | promote | demote | delete
 
 The same things are on the web at /admin for accounts with the admin flag; the
@@ -129,13 +129,19 @@ def _invite(args: argparse.Namespace) -> int:
         print(f"{base}/signup?code={code}")
         print(f"valid for {users.INVITE_TTL_MS // (24 * 3600 * 1000)} days, single use")
         return 0
+    if args.invite_cmd == "delete":
+        if users.delete_invite(args.code):
+            print("invitation deleted; its link no longer works")
+            return 0
+        print(f"no invitation with code {args.code}", file=sys.stderr)
+        return 1
     rows = users.list_invites()
     if not rows:
         print("no invitations yet")
         return 0
     for r in rows:
-        print(f"{r['state']:8} {(r['label'] or '-'):20} expires {_fmt_ms(r['expires_at_ms'])}"
-              f"  {r['code'][:12]}...")
+        print(f"{r['state']:8} {(r['label'] or '-'):20} "
+              f"expires {_fmt_ms(r['expires_at_ms'])}  {r['code']}")
     return 0
 
 
@@ -210,6 +216,9 @@ def main(argv: list[str] | None = None) -> int:
     invite_create = invite_sub.add_parser("create", help="print a one-time signup link")
     invite_create.add_argument("--label", default="", help="who it is for")
     invite_sub.add_parser("list", help="open, used and expired invitations")
+    invite_delete = invite_sub.add_parser(
+        "delete", help="revoke an invitation (or drop a used record)")
+    invite_delete.add_argument("code")
 
     user = sub.add_parser("user", help="accounts (server side)")
     user_sub = user.add_subparsers(dest="user_cmd", required=True)

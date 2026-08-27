@@ -509,10 +509,21 @@ def _admin_html(admin_id: int, new_link: str = "", error: str = "",
     inv_rows = []
     for i in users.list_invites():
         cls = {"open": "ok", "used": "", "expired": "err"}[i["state"]]
+        # An open invitation shows its link again, so it can be re-sent without
+        # creating a second one. Not named `link`: that holds the block for a
+        # just-created invitation, and shadowing it swallowed the mail texts.
+        row_link = (f'<br><span class="mono">{esc(base)}/signup?code={esc(i["code"])}</span>'
+                    if i["state"] == "open" and base else "")
+        confirm = ("Revoke this invitation? The link stops working immediately."
+                   if i["state"] == "open" else "Delete this invitation record?")
         inv_rows.append(
-            f'<tr><td>{esc(i["label"] or "-")}</td>'
+            f'<tr><td>{esc(i["label"] or "-")}{row_link}</td>'
             f'<td class="{cls}">{i["state"]}</td>'
-            f'<td class="mono">expires {_ms(i["expires_at_ms"])}</td></tr>')
+            f'<td class="mono">expires {_ms(i["expires_at_ms"])}</td>'
+            f'<td><form method="post" action="/admin/invite/delete"'
+            f' onsubmit="return confirm(\'{confirm}\')">'
+            f'<input type="hidden" name="code" value="{esc(i["code"])}">'
+            f'<button class="danger">delete</button></form></td></tr>')
     invites_table = ("<p>No invitations yet.</p>" if not inv_rows else
                      '<table><tbody>' + "".join(inv_rows) + "</tbody></table>")
 
@@ -535,7 +546,7 @@ async def get_admin(request: Request) -> Response:
     admin_id, err = _require_admin(request)
     if err is not None:
         return err
-    return page("Administration", _admin_html(admin_id))
+    return page("Administration", _admin_html(admin_id, base=base_url(request)))
 
 
 async def post_admin_invite(request: Request) -> Response:
@@ -547,6 +558,15 @@ async def post_admin_invite(request: Request) -> Response:
     base = base_url(request)
     return page("Administration",
                 _admin_html(admin_id, f"{base}/signup?code={code}", base=base))
+
+
+async def post_admin_invite_delete(request: Request) -> Response:
+    admin_id, err = _require_admin(request)
+    if err is not None:
+        return err
+    form = await request.form()
+    users.delete_invite(str(form.get("code") or ""))
+    return RedirectResponse("/admin", status_code=303)
 
 
 async def post_admin_user(request: Request) -> Response:
