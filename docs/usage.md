@@ -186,6 +186,86 @@ More:
 
 > What is my training status and where is my load focus?
 
+## Trends over a period
+
+> **How did my resting heart rate and Body Battery develop this month?**
+
+`get_health_trend` answers a whole month in three requests, one row per day:
+
+```json
+[
+  {"day": "2026-08-20", "steps": 11429, "step_goal": 10000, "distance_km": 9.099,
+   "body_battery_charged": 52, "body_battery_drained": 47},
+  {"day": "2026-08-21", "steps": 16416, "distance_km": 14.831,
+   "body_battery_charged": 48, "body_battery_drained": 50, "vo2max_running": 50.9}
+]
+```
+
+Ask `get_daily_health` for one specific day when you need sleep, HRV, stress or
+readiness - Garmin has no range endpoint for those, so a week of them is seven
+calls and worth asking for deliberately.
+
+## The plan, not just the record
+
+> **What is scheduled for the next two weeks?**
+
+> **Which planned sessions did I skip in July?**
+
+`get_calendar` returns what was planned - workouts from a training plan and
+events such as races:
+
+```json
+[
+  {"type": "workout", "id": 77, "title": "4x1000m", "date": "2026-09-02",
+   "sport": "running", "planned_duration_min": 60.0, "training_plan_id": 42},
+  {"type": "event", "id": 28616365, "title": "IRONMAN Vichy", "date": "2026-08-23",
+   "start_time": "07:00", "timezone": "Europe/Paris", "is_race": true,
+   "target": "226.0 kilometer"}
+]
+```
+
+Combined with `list_activities` this answers the comparison question directly:
+what was due, what actually happened, what is missing. `list_planned_workouts`
+adds the written content of a session - the intervals, the rests, the notes.
+
+## Where you stand
+
+> **What does Garmin think I could run right now?**
+
+`get_fitness_metrics`:
+
+```json
+{
+  "race_predictions": {"5k": "22:54", "10k": "48:25",
+                       "half_marathon": "1:47:53", "marathon": "3:54:39"},
+  "fitness_age": 49.0, "chronological_age": 58, "achievable_fitness_age": 50.7,
+  "endurance_score": 7497, "hill_score": 38, "vo2max": 50.5,
+  "lifetime": {"activities": 6607, "distance_km": 129757.9, "hours": 7111}
+}
+```
+
+> **What are my personal records, and when did I set them?**
+
+`list_personal_records` returns each record with the activity behind it, so the
+follow-up question - "what did that race look like?" - is one more call away.
+
+## Zones and weather
+
+`get_activity` now carries the time per heart rate zone, the same for power
+where a meter was present, and the weather at the time:
+
+```json
+{
+  "hr_zones": [{"zone": 2, "from_bpm": 96, "minutes": 41.3},
+               {"zone": 3, "from_bpm": 112, "minutes": 12.8}],
+  "weather": {"temperature_c": 15.0, "humidity_pct": 94, "wind_kmh": 16.1,
+              "wind_from": "n", "conditions": "Showers"}
+}
+```
+
+That makes fair comparisons possible: "was I slower because it was hotter, or
+because I was tired?" is answerable when both sides are in the data.
+
 ## Challenges
 
 > **Where do I stand in the running challenge?**
@@ -217,8 +297,11 @@ The interesting ones. The model works these out by combining calls:
 > `get_profile` for the threshold heart rate, `get_activity_streams` for the
 > heart rate curve.
 
-> **Did I recover from Vichy, and what does the trend say?**
-> `get_daily_health` for several days plus `get_training_status`.
+> **Did I recover from the race, and what does the trend say?**
+> `get_health_trend` over the past weeks plus `get_training_status`.
+
+> **Did I train what my plan asked for last month?**
+> `get_calendar` for what was due, `list_activities` for what happened.
 
 ## Practical tips
 

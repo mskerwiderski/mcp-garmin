@@ -241,3 +241,202 @@ def challenge_detail(c: dict, my_display_name: str = "") -> dict:
         board.append(compact(row))
     return compact({**challenge_summary(c), "players": len(players) or None,
                     "leaderboard": board})
+
+
+# --- fitness metrics -------------------------------------------------------
+
+# Garmin identifies personal records by a numeric type only. These labels were
+# derived from the values themselves (a 5407 next to a half marathon is a time,
+# a 42999 next to a long run is metres), not from a documented list - unknown
+# ids are passed through unlabelled rather than guessed at.
+PR_TYPES = {
+    1: ("1 km", "time_s"),
+    2: ("1 mile", "time_s"),
+    3: ("5 km", "time_s"),
+    4: ("10 km", "time_s"),
+    5: ("half marathon", "time_s"),
+    6: ("marathon", "time_s"),
+    7: ("longest run", "distance_m"),
+    8: ("longest ride", "distance_m"),
+    9: ("biggest climb", "elevation_m"),
+}
+
+
+def _hms(seconds) -> str | None:
+    if not isinstance(seconds, (int, float)) or seconds <= 0:
+        return None
+    seconds = int(round(seconds))
+    h, rest = divmod(seconds, 3600)
+    m, s = divmod(rest, 60)
+    return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+
+
+def personal_records(items: list[dict]) -> list[dict]:
+    out = []
+    for r in items:
+        label, kind = PR_TYPES.get(r.get("typeId"), (None, None))
+        value = r.get("value")
+        row = {
+            "record": label,
+            "type_id": r.get("typeId"),
+            "sport": r.get("activityType"),
+            "date": (r.get("actStartDateTimeInGMTFormatted") or "")[:10],
+            "activity_id": r.get("activityId"),
+            "activity_name": r.get("activityName"),
+        }
+        if kind == "time_s":
+            row["time"] = _hms(value)
+            row["time_s"] = _round(value, 1)
+        elif kind == "distance_m":
+            row["distance_km"] = _km(value)
+        elif kind == "elevation_m":
+            row["elevation_m"] = _round(value, 0)
+        else:
+            row["value"] = _round(value, 2)
+        out.append(compact(row))
+    return sorted(out, key=lambda r: (r.get("type_id") or 0))
+
+
+def fitness_metrics(predictions: dict, age: dict, endurance: dict, hill: dict,
+                    totals: dict) -> dict:
+    races = {}
+    for key, label in (("time5K", "5k"), ("time10K", "10k"),
+                       ("timeHalfMarathon", "half_marathon"),
+                       ("timeMarathon", "marathon")):
+        races[label] = _hms(predictions.get(key))
+    metrics = (totals.get("userMetrics") or [{}])[0]
+    return compact({
+        "race_predictions": compact(races),
+        "fitness_age": _round(age.get("fitnessAge"), 1),
+        "chronological_age": age.get("chronologicalAge"),
+        "achievable_fitness_age": _round(age.get("achievableFitnessAge"), 1),
+        "endurance_score": endurance.get("overallScore"),
+        "hill_score": hill.get("overallScore"),
+        "hill_strength": hill.get("strengthScore"),
+        "hill_endurance": hill.get("enduranceScore"),
+        "vo2max": hill.get("vo2MaxPreciseValue"),
+        "lifetime": compact({
+            "activities": metrics.get("totalActivities"),
+            "distance_km": _km(metrics.get("totalDistance")),
+            "hours": _round((metrics.get("totalDuration") or 0) / 3600, 0) or None,
+            "elevation_m": _round(metrics.get("totalElevationGain"), 0),
+        }),
+    })
+
+
+# --- trends ----------------------------------------------------------------
+
+
+def health_trend(steps: list[dict], battery: list[dict],
+                 vo2max: list[dict]) -> list[dict]:
+    """One row per day, merged from three range endpoints. The Body Battery
+    response also carries the full intraday curve - dropped here, since a month
+    of curves is tens of thousands of numbers."""
+    by_day: dict[str, dict] = {}
+    for s in steps:
+        day = s.get("calendarDate")
+        if day:
+            by_day.setdefault(day, {"day": day}).update({
+                "steps": s.get("totalSteps"),
+                "step_goal": s.get("stepGoal"),
+                "distance_km": _km(s.get("totalDistance")),
+            })
+    for b in battery:
+        day = b.get("date")
+        if day:
+            by_day.setdefault(day, {"day": day}).update({
+                "body_battery_charged": b.get("charged"),
+                "body_battery_drained": b.get("drained"),
+            })
+    for v in vo2max:
+        run, bike = v.get("generic") or {}, v.get("cycling") or {}
+        day = run.get("calendarDate") or bike.get("calendarDate")
+        if day:
+            by_day.setdefault(day, {"day": day}).update(compact({
+                "vo2max_running": run.get("vo2MaxPreciseValue"),
+                "vo2max_cycling": bike.get("vo2MaxPreciseValue"),
+            }))
+    return [compact(by_day[d]) for d in sorted(by_day)]
+
+
+# --- plan and races --------------------------------------------------------
+
+
+def planned_workout(w: dict) -> dict:
+    sport = (w.get("sportType") or {}).get("sportTypeKey")
+    return compact({
+        "workout_id": w.get("workoutId"),
+        "name": w.get("workoutName"),
+        "sport": sport,
+        "description": (w.get("description") or "").strip() or None,
+        # Garmin stores 0 for "not estimated"; reporting a 0 minute workout
+        # would be worse than saying nothing.
+        "estimated_duration_min": _min(w.get("estimatedDurationInSecs")) or None,
+        "estimated_distance_km": _km(w.get("estimatedDistanceInMeters")) or None,
+        "updated": (w.get("updateDate") or "")[:10],
+    })
+
+
+# Calendar entries this connector reports. Activities, weight and blood
+# pressure entries also live in the calendar but are covered by their own
+# tools, so they are filtered out rather than duplicated.
+CALENDAR_TYPES = ("workout", "event")
+
+
+def calendar_item(i: dict) -> dict:
+    """One scheduled item. Accounts differ in what they schedule - a training
+    plan fills this with workouts, a racer with events - so every field is
+    optional and missing ones simply do not appear."""
+    target = i.get("completionTarget") or {}
+    sport = (i.get("sportTypeKey") or (i.get("sportType") or {}).get("sportTypeKey")
+             or i.get("workoutSportTypeKey"))
+    return compact({
+        "type": i.get("itemType"),
+        "id": i.get("workoutId") or i.get("id"),
+        "title": i.get("title") or i.get("workoutName"),
+        "date": i.get("date"),
+        "sport": sport,
+        "start_time": (i.get("eventTimeLocal") or {}).get("startTimeHhMm"),
+        "timezone": (i.get("eventTimeLocal") or {}).get("timeZoneId"),
+        "is_race": i.get("isRace"),
+        "training_plan_id": i.get("trainingPlanId"),
+        "planned_duration_min": _min(i.get("duration") or i.get("estimatedDurationInSecs")),
+        "planned_distance_km": _km(i.get("distance") or i.get("estimatedDistanceInMeters")),
+        "target": (f"{target.get('value')} {target.get('unit')}"
+                   if target.get("value") else None),
+        "completed": i.get("completed"),
+    })
+
+
+# --- per-activity context --------------------------------------------------
+
+
+def time_in_zones(zones: list[dict], unit: str = "bpm") -> list[dict]:
+    """Only zones with time in them; a list of five zeroes tells nobody
+    anything."""
+    return [compact({
+        "zone": z.get("zoneNumber"),
+        f"from_{unit}": z.get("zoneLowBoundary"),
+        "minutes": _min(z.get("secsInZone")),
+    }) for z in zones if (z.get("secsInZone") or 0) > 0]
+
+
+def weather(w: dict) -> dict:
+    """Garmin serves this endpoint in Fahrenheit and mph whatever the account
+    settings say - everything else in this connector is metric, so convert."""
+    def c_from_f(f):
+        return round((f - 32) * 5 / 9, 1) if isinstance(f, (int, float)) else None
+
+    def kmh(mph):
+        return round(mph * 1.609344, 1) if isinstance(mph, (int, float)) else None
+
+    return compact({
+        "temperature_c": c_from_f(w.get("temp")),
+        "feels_like_c": c_from_f(w.get("apparentTemp")),
+        "dew_point_c": c_from_f(w.get("dewPoint")),
+        "humidity_pct": w.get("relativeHumidity"),
+        "wind_kmh": kmh(w.get("windSpeed")),
+        "wind_gust_kmh": kmh(w.get("windGust")),
+        "wind_from": w.get("windDirectionCompassPoint"),
+        "conditions": (w.get("weatherTypeDTO") or {}).get("desc"),
+    })

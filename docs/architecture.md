@@ -157,7 +157,7 @@ worth it once that happens more than twice.
 
 ## Tests
 
-94 tests, no network. The Garmin API is stubbed at the client boundary, FIT
+103 tests, no network. The Garmin API is stubbed at the client boundary, FIT
 files are synthesised with `fit-tool`, and the HTTP surface is driven through
 Starlette's `TestClient`, including a full OAuth handshake the way claude.ai
 walks it.

@@ -1635,3 +1635,123 @@ class GarminClient:
         if r.status_code != 200:
             raise GarminError(f"challenge {uuid} HTTP {r.status_code}")
         return r.json() or {}
+
+    # ---------- fitness metrics ----------
+
+    async def personal_records(self) -> list[dict]:
+        """All-time personal records (typeId per record kind, value in seconds
+        or metres depending on the kind)."""
+        r = await self._http.get(
+            f"{CONNECT_API}/personalrecord-service/personalrecord/prs/"
+            f"{await self.profile_display_id()}", headers=await self._bearer())
+        if r.status_code != 200:
+            raise GarminError(f"personal records HTTP {r.status_code}")
+        arr = r.json() or []
+        return arr if isinstance(arr, list) else []
+
+    async def race_predictions(self) -> dict:
+        """Garmin's current 5k/10k/half/marathon predictions, in seconds."""
+        r = await self._http.get(
+            f"{CONNECT_API}/metrics-service/metrics/racepredictions/latest/"
+            f"{await self.profile_display_id()}", headers=await self._bearer())
+        return (r.json() or {}) if r.status_code == 200 else {}
+
+    async def fitness_age(self, day: str) -> dict:
+        r = await self._http.get(f"{CONNECT_API}/fitnessage-service/fitnessage/{day}",
+                                 headers=await self._bearer())
+        return (r.json() or {}) if r.status_code == 200 else {}
+
+    async def endurance_score(self, day: str) -> dict:
+        r = await self._http.get(
+            f"{CONNECT_API}/metrics-service/metrics/endurancescore?calendarDate={day}",
+            headers=await self._bearer())
+        return (r.json() or {}) if r.status_code == 200 else {}
+
+    async def hill_score(self, day: str) -> dict:
+        r = await self._http.get(
+            f"{CONNECT_API}/metrics-service/metrics/hillscore?calendarDate={day}",
+            headers=await self._bearer())
+        return (r.json() or {}) if r.status_code == 200 else {}
+
+    async def lifetime_totals(self) -> dict:
+        r = await self._http.get(
+            f"{CONNECT_API}/userstats-service/statistics/"
+            f"{await self.profile_display_id()}", headers=await self._bearer())
+        return (r.json() or {}) if r.status_code == 200 else {}
+
+    # ---------- ranges: one call instead of one call per day ----------
+
+    async def steps_range(self, start: str, end: str) -> list[dict]:
+        r = await self._http.get(
+            f"{CONNECT_API}/usersummary-service/stats/steps/daily/{start}/{end}",
+            headers=await self._bearer())
+        if r.status_code != 200:
+            return []
+        arr = r.json() or []
+        return arr if isinstance(arr, list) else []
+
+    async def body_battery_range(self, start: str, end: str) -> list[dict]:
+        """Per day charged/drained. The response also carries the full intraday
+        curve; callers are expected to drop it."""
+        r = await self._http.get(
+            f"{CONNECT_API}/wellness-service/wellness/bodyBattery/reports/daily",
+            params={"startDate": start, "endDate": end}, headers=await self._bearer())
+        if r.status_code != 200:
+            return []
+        arr = r.json() or []
+        return arr if isinstance(arr, list) else []
+
+    async def vo2max_range(self, start: str, end: str) -> list[dict]:
+        """maxmet history: one entry per day, `generic` = running, `cycling`
+        separate, either may be null."""
+        r = await self._http.get(
+            f"{CONNECT_API}/metrics-service/metrics/maxmet/daily/{start}/{end}",
+            headers=await self._bearer())
+        if r.status_code != 200:
+            return []
+        arr = r.json() or []
+        return arr if isinstance(arr, list) else []
+
+    # ---------- plan ----------
+
+    async def planned_workouts(self, limit: int = 20) -> list[dict]:
+        """The structured workouts stored in the account."""
+        r = await self._http.get(f"{CONNECT_API}/workout-service/workouts",
+                                 params={"start": 1, "limit": limit},
+                                 headers=await self._bearer())
+        if r.status_code != 200:
+            raise GarminError(f"workouts HTTP {r.status_code}")
+        arr = r.json() or []
+        return arr if isinstance(arr, list) else []
+
+    async def calendar_month(self, year: int, month: int) -> list[dict]:
+        """calendarItems of one month. month is 1-12 here; Garmin's own path
+        counts months from 0, which this method hides."""
+        r = await self._http.get(
+            f"{CONNECT_API}/calendar-service/year/{year}/month/{month - 1}",
+            headers=await self._bearer())
+        if r.status_code != 200:
+            return []
+        return (r.json() or {}).get("calendarItems") or []
+
+    # ---------- per-activity context ----------
+
+    async def activity_weather(self, activity_id: int) -> dict:
+        """Weather at the time of the activity. Garmin answers in Fahrenheit
+        and mph here regardless of account settings."""
+        r = await self._http.get(
+            f"{CONNECT_API}/activity-service/activity/{activity_id}/weather",
+            headers=await self._bearer())
+        return (r.json() or {}) if r.status_code == 200 else {}
+
+    async def activity_time_in_zones(self, activity_id: int, kind: str = "hr") -> list[dict]:
+        """Time per heart rate or power zone. Empty for activities recorded
+        without the matching sensor, which is not an error."""
+        path = "hrTimeInZones" if kind == "hr" else "powerTimeInZones"
+        r = await self._http.get(
+            f"{CONNECT_API}/activity-service/activity/{activity_id}/{path}",
+            headers=await self._bearer())
+        if r.status_code != 200:
+            return []
+        arr = r.json() or []
+        return arr if isinstance(arr, list) else []

@@ -94,6 +94,14 @@ Battery, sleep phases with score, HRV status and training readiness. Plus
 training status with load focus and VO2max, body composition and blood pressure
 over a date range.
 
+**Trends and plan** - a whole month of steps, Body Battery and VO2max in one
+call instead of one per day; the scheduled side of Garmin with training-plan
+workouts and races, so "what was planned" and "what happened" can be compared.
+
+**Where you stand** - race predictions for 5k to marathon, fitness age,
+endurance and hill score, lifetime totals, and your personal records with the
+activity that set each one.
+
 **Context** - your thresholds and heart rate zones, your gear with accumulated
 distance, and the social challenges you run against friends, including the one
 currently in progress.
@@ -135,7 +143,7 @@ python3.12 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 .venv/bin/pytest
 ```
 
-94 tests, no network access required - the Garmin API and the FIT files are
+103 tests, no network access required - the Garmin API and the FIT files are
 stubbed or synthesised. See [docs/architecture.md](docs/architecture.md) for how
 the pieces fit together.
 

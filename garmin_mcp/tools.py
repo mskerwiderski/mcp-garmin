@@ -85,11 +85,24 @@ def register(server: MCPServer, get_session=current_session) -> MCPServer:
         sport, times, distance, heart rate, power, elevation, training effect
         and assigned gear.
 
+        Includes time per heart rate and power zone and the weather at the
+        time, where the activity has them.
+
         These are the values Garmin computed server-side. Where elevation or
         pause handling is in question, compare with analyze_activity_fit,
         which reads the file the watch wrote."""
         c = await S().client()
-        return project.activity_detail(await c.get_activity_detail(int(activity_id)))
+        activity_id = int(activity_id)
+        view = project.activity_detail(await c.get_activity_detail(activity_id))
+        # Best effort: an activity without a heart rate belt or power meter
+        # simply has no zones, and that must not fail the whole call.
+        hr = project.time_in_zones(
+            await c.activity_time_in_zones(activity_id, "hr"), "bpm")
+        power = project.time_in_zones(
+            await c.activity_time_in_zones(activity_id, "power"), "watt")
+        weather = project.weather(await c.activity_weather(activity_id))
+        return project.compact({**view, "hr_zones": hr, "power_zones": power,
+                                "weather": weather})
 
     # ---------------------------------------------------------- FIT analysis
 
@@ -140,6 +153,99 @@ def register(server: MCPServer, get_session=current_session) -> MCPServer:
         fields that stayed empty or constant - that is how you tell whether an
         external sensor (Stryd, Moxy/SmO2, CORE) was actually connected."""
         return fitview.sensors(await _fit(S(), int(activity_id)))
+
+    # ---------------------------------------------------------- trends
+
+    @server.tool()
+    @_guard
+    async def get_health_trend(date_from: str, date_to: str) -> list[dict]:
+        """Daily health values over a whole period in one call: steps and step
+        goal, distance, Body Battery charged and drained, and VO2max for
+        running and cycling.
+
+        Use this instead of calling get_daily_health once per day - a month
+        costs three requests here and thirty there. For sleep, HRV, stress and
+        training readiness of a single day, get_daily_health is still the
+        right tool."""
+        c = await S().client()
+        start, end = _day(date_from), _day(date_to)
+        return project.health_trend(
+            await c.steps_range(start, end),
+            await c.body_battery_range(start, end),
+            await c.vo2max_range(start, end))
+
+    # ---------------------------------------------------------- plan
+
+    @server.tool()
+    @_guard
+    async def get_calendar(date_from: str, date_to: str) -> list[dict]:
+        """What was planned in a period: scheduled workouts from a training
+        plan and events such as races, with date, sport, planned duration or
+        distance and the target.
+
+        This is the plan, not the record - what actually happened is in
+        list_activities. Accounts without a training plan will only see
+        events, and accounts with neither get an empty list."""
+        c = await S().client()
+        start, end = date.fromisoformat(_day(date_from)), date.fromisoformat(_day(date_to))
+        if end < start:
+            raise ValueError("date_to is before date_from")
+        if (end - start).days > 370:
+            raise ValueError("range too long, ask for at most a year")
+        seen: dict = {}
+        year, month = start.year, start.month
+        while (year, month) <= (end.year, end.month):
+            for item in await c.calendar_month(year, month):
+                if item.get("itemType") not in project.CALENDAR_TYPES:
+                    continue
+                day = item.get("date") or ""
+                if start.isoformat() <= day <= end.isoformat():
+                    seen[f"{item.get('itemType')}:{item.get('id')}:{day}"] = item
+            year, month = (year + 1, 1) if month == 12 else (year, month + 1)
+        return sorted((project.calendar_item(i) for i in seen.values()),
+                      key=lambda i: i.get("date") or "")
+
+    @server.tool()
+    @_guard
+    async def list_planned_workouts(limit: int = 20) -> list[dict]:
+        """The structured workouts stored in this Garmin account: name, sport,
+        the written description and any estimated duration or distance.
+
+        These are the workout definitions, not their scheduling - use
+        get_calendar to see when they are due."""
+        c = await S().client()
+        rows = await c.planned_workouts(max(1, min(int(limit), MAX_LIMIT)))
+        return [project.planned_workout(w) for w in rows]
+
+    # ---------------------------------------------------------- fitness
+
+    @server.tool()
+    @_guard
+    async def get_fitness_metrics(day: str | None = None) -> dict:
+        """Garmin's summary judgements about your fitness: race time
+        predictions for 5k, 10k, half and full marathon, fitness age against
+        your real age, endurance score, hill score with its strength and
+        endurance parts, VO2max, and your lifetime totals.
+
+        day defaults to today; the scores are computed per day."""
+        c = await S().client()
+        when = _day(day)
+        return project.fitness_metrics(
+            await c.race_predictions(), await c.fitness_age(when),
+            await c.endurance_score(when), await c.hill_score(when),
+            await c.lifetime_totals())
+
+    @server.tool()
+    @_guard
+    async def list_personal_records() -> list[dict]:
+        """All-time personal records with the activity that set them: fastest
+        1 km, mile, 5 km, 10 km, half marathon and marathon, longest run and
+        ride, biggest climb.
+
+        Records Garmin identifies by a type this connector does not know are
+        returned with their raw value rather than dropped."""
+        c = await S().client()
+        return project.personal_records(await c.personal_records())
 
     # ---------------------------------------------------------- health
 

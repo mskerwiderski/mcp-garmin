@@ -55,6 +55,16 @@ class FakeClient:
     async def get_activity_detail(self, activity_id):
         return ACTIVITY_DETAIL
 
+    async def activity_time_in_zones(self, activity_id, kind="hr"):
+        if kind != "hr":
+            return []                      # no power meter on this activity
+        return [{"zoneNumber": 1, "secsInZone": 600.0, "zoneLowBoundary": 80},
+                {"zoneNumber": 2, "secsInZone": 0.0, "zoneLowBoundary": 96}]
+
+    async def activity_weather(self, activity_id):
+        return {"temp": 59, "relativeHumidity": 94, "windSpeed": 10,
+                "weatherTypeDTO": {"desc": "Showers"}}
+
     async def download_original_fit(self, activity_id):
         return self._fit if activity_id == 4242 else None
 
@@ -170,7 +180,8 @@ def test_all_tools_are_registered(server):
         "get_activity_streams", "get_swim_detail", "get_activity_sensors",
         "get_daily_health", "get_training_status", "get_body_composition",
         "get_blood_pressure", "list_challenges", "get_challenge", "list_gear",
-        "get_profile", "whoami"}
+        "get_profile", "whoami", "get_health_trend", "get_calendar",
+        "list_planned_workouts", "get_fitness_metrics", "list_personal_records"}
 
 
 def test_every_tool_has_a_description(server):
@@ -206,6 +217,14 @@ def test_get_activity_drops_garmin_noise(server):
     assert a["name"] == "Morning Run" and a["gear"] == ["Nimbus 26"]
     assert a["normalized_power"] == 251
     assert "summarizedDiveInfo" not in a and "metadataDTO" not in a
+
+
+def test_get_activity_adds_zones_and_weather(server):
+    a = call(server, "get_activity", activity_id=4242)
+    assert a["hr_zones"] == [{"zone": 1, "from_bpm": 80, "minutes": 10.0}]
+    assert a["weather"]["temperature_c"] == 15.0
+    # An activity without a power meter must not carry an empty key.
+    assert "power_zones" not in a
 
 
 def test_analyze_activity_fit_reads_the_file(server):

@@ -1,6 +1,6 @@
 # Tool reference
 
-Fifteen tools, all read-only. Distances are metres or kilometres as named,
+Twenty tools, all read-only. Distances are metres or kilometres as named,
 durations are seconds or minutes as named, dates are `YYYY-MM-DD` calendar days
 in your local time.
 
@@ -33,6 +33,17 @@ type, local and GMT start, timezone, distance, durations (moving, elapsed),
 heart rate, power including normalized power, cadence, elevation gain and loss,
 calories, aerobic and anaerobic training effect, temperatures, whether Garmin's
 elevation correction is on, and assigned gear.
+
+Adds three things Garmin keeps separately:
+
+- `hr_zones` - minutes per heart rate zone, only zones with time in them
+- `power_zones` - the same for power, present when the activity has it
+- `weather` - `temperature_c`, `feels_like_c`, `dew_point_c`, `humidity_pct`,
+  `wind_kmh`, `wind_from`, `conditions`. Garmin serves this endpoint in
+  Fahrenheit and mph whatever your account says; the values here are converted.
+
+All three are best effort: an activity recorded without a heart rate belt, a
+power meter or a location simply has fewer of them.
 
 These are the numbers Garmin computed on its servers. For what the watch
 recorded, use `analyze_activity_fit`.
@@ -119,6 +130,70 @@ Per day: `weight_kg`, `body_fat_pct`, `muscle_mass_kg`, `bmi`, `source`.
 ### `get_blood_pressure(date_from, date_to)`
 
 Per measurement: `measured_at`, `systolic`, `diastolic`, `pulse`, `note`.
+
+---
+
+## Trends and plan
+
+### `get_health_trend(date_from, date_to)`
+
+Daily values across a whole period in **three** requests instead of one per
+day: `steps`, `step_goal`, `distance_km`, `body_battery_charged`,
+`body_battery_drained`, `vo2max_running`, `vo2max_cycling`. One row per day,
+days without data simply missing.
+
+Use this for any question about a period. For sleep, HRV, stress and training
+readiness of a single day, `get_daily_health` remains the right tool - those
+have no range endpoint at Garmin.
+
+The Body Battery response also carries the full intraday curve; it is dropped
+here, because a month of curves is tens of thousands of numbers.
+
+### `get_calendar(date_from, date_to)`
+
+What was **planned**: scheduled workouts from a training plan and events such
+as races. Per item: `type` (`workout` or `event`), `id`, `title`, `date`,
+`sport`, `start_time`, `timezone`, `is_race`, `training_plan_id`,
+`planned_duration_min`, `planned_distance_km`, `target`.
+
+Accounts differ in what they schedule, so fields are optional throughout: an
+account following a plan sees workouts, a racer sees events, an account with
+neither gets an empty list. What actually happened is in `list_activities` -
+the calendar's own activity, weight and blood pressure entries are filtered out
+rather than duplicated.
+
+Ranges longer than a year are refused; the underlying endpoint works per month.
+
+### `list_planned_workouts(limit=20)`
+
+The structured workouts stored in the account: `workout_id`, `name`, `sport`,
+`description`, `estimated_duration_min`, `estimated_distance_km`, `updated`.
+
+These are definitions, not appointments - `get_calendar` says when they are due.
+
+---
+
+## Fitness
+
+### `get_fitness_metrics(day=None)`
+
+Garmin's summary judgements in one call:
+
+- `race_predictions` - `5k`, `10k`, `half_marathon`, `marathon` as `h:mm:ss`
+- `fitness_age`, `chronological_age`, `achievable_fitness_age`
+- `endurance_score`, `hill_score`, `hill_strength`, `hill_endurance`, `vo2max`
+- `lifetime` - `activities`, `distance_km`, `hours`, `elevation_m`
+
+### `list_personal_records()`
+
+All-time records with the activity that set each one: `record` (a label such as
+`5 km` or `longest ride`), `type_id`, `sport`, `date`, `activity_id`,
+`activity_name`, and either `time` plus `time_s`, `distance_km` or
+`elevation_m`.
+
+Garmin identifies records by a numeric type only. The labels cover the common
+running and cycling records; anything else - swimming records, for instance -
+is returned with its raw `value` and `type_id` rather than a guessed label.
 
 ---
 
