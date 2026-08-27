@@ -211,20 +211,31 @@ def test_cli_invite_list_prints_the_full_code(capsys, user_id):
     assert code in capsys.readouterr().out       # truncated codes cannot be deleted
 
 
-def test_the_mail_text_is_wrapped_after_the_link_is_inserted():
-    """The template cannot be wrapped in the source: a real host name is much
-    longer than the placeholder, which left 100-character lines next to
-    50-character ones."""
-    from garmin_mcp.web import WRAP_AT, invitation_mail
+def test_paragraphs_are_not_hard_wrapped():
+    """Mail clients wrap to the reader's window. Breaking sentences ourselves
+    only produces ragged edges - and the breaks move as soon as the host name
+    or the link is longer than the placeholder it replaced."""
+    from garmin_mcp.web import invitation_mail
     long_host = "https://mcp.garmin.a-rather-long-hostname.example"
     for german in (False, True):
         _, body = invitation_mail(f"{long_host}/signup?code={'x' * 32}",
                                   long_host, german)
+        sentences = [line for line in body.split("\n")
+                     if line and "://" not in line and not line.startswith("   ")]
+        # Every prose paragraph is one line, however long it is.
+        assert any(len(line) > 120 for line in sentences)
         for line in body.split("\n"):
-            if "://" in line:
-                assert line.strip().startswith("http")     # never broken up
-                continue
-            assert len(line) <= WRAP_AT, line
+            assert not line.endswith(" ")           # no leftover wrap artefacts
+
+
+def test_structure_still_gets_its_own_lines():
+    """Not wrapping prose must not collapse the steps into one block."""
+    from garmin_mcp.web import invitation_mail
+    _, body = invitation_mail("https://x.example/signup?code=1", "https://x.example")
+    lines = body.split("\n")
+    assert sum(1 for line in lines if line.startswith(("1. ", "2. ", "3. "))) == 3
+    assert sum(1 for line in lines if line.startswith("   - ")) == 3
+    assert "       https://x.example/mcp" in lines
 
 
 def test_urls_survive_wrapping_unbroken():

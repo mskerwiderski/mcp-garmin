@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import html as html_lib
 import os
-import textwrap
 import urllib.parse
 
 from starlette.requests import Request
@@ -332,10 +331,11 @@ async def post_garmin_disconnect(request: Request) -> Response:
 MAIL_SUBJECT_EN = "Your access to my Garmin connector"
 MAIL_SUBJECT_DE = "Dein Zugang zu meinem Garmin-Connector"
 
-# Written as one line per paragraph on purpose: the wrapping happens after the
-# host name and the link have been substituted. Wrapping the template instead
-# produced 100-character lines next to 50-character ones, because a real host
-# name is nothing like the placeholder it replaces.
+# One line per paragraph, and deliberately not wrapped anywhere: mail clients
+# wrap to the reader's window, so hard breaks inside a sentence only show up as
+# ragged edges - and they move when the host name or the link is longer than
+# the placeholder they replace. Only structure gets its own line: the steps,
+# the bullets, and the addresses.
 MAIL_EN = """Hi,
 
 here is your personal invitation to {host} - a small server that lets Claude or ChatGPT answer questions about your own Garmin data. It only reads: it can never change or delete anything in your Garmin account.
@@ -396,43 +396,12 @@ Schritt für Schritt erklärt:
 https://github.com/mskerwiderski/mcp-garmin/blob/main/docs/guest-access.md
 """
 
-WRAP_AT = 72
-
-
-def _wrap_mail(text: str) -> str:
-    """Wrap prose to a readable width, leave URLs and commands alone.
-
-    Lines that carry an address must survive untouched - a broken URL is worse
-    than a long line, and mail clients turn only unbroken ones into links.
-    """
-    out: list[str] = []
-    for line in text.split("\n"):
-        body = line.strip()
-        if not body:
-            out.append("")
-            continue
-        indent = " " * (len(line) - len(line.lstrip()))
-        if "://" in body:
-            out.append(line.rstrip())
-            continue
-        if body.startswith("- "):
-            hanging = indent + "  "
-        elif len(body) > 2 and body[0].isdigit() and body[1:3] == ". ":
-            hanging = indent + "   "
-        else:
-            hanging = indent
-        out.extend(textwrap.wrap(body, WRAP_AT, initial_indent=indent,
-                                 subsequent_indent=hanging))
-    return "\n".join(out)
-
-
 def invitation_mail(link: str, base: str, german: bool = False) -> tuple[str, str]:
     """(subject, body) for one invitation link."""
     host = base.split("://", 1)[-1]
     template = MAIL_DE if german else MAIL_EN
     subject = MAIL_SUBJECT_DE if german else MAIL_SUBJECT_EN
-    filled = template.format(host=host, link=link, mcp_url=f"{base}/mcp")
-    return subject, _wrap_mail(filled)
+    return subject, template.format(host=host, link=link, mcp_url=f"{base}/mcp")
 
 
 def _mail_block(title: str, subject: str, body: str, ident: str) -> str:
@@ -440,7 +409,7 @@ def _mail_block(title: str, subject: str, body: str, ident: str) -> str:
               + "&body=" + urllib.parse.quote(body))
     return f"""<div class="card"><b>{esc(title)}</b><br>
 <span class="mono">Subject: {esc(subject)}</span>
-<textarea id="{ident}" rows="12" readonly>{esc(body)}</textarea>
+<textarea id="{ident}" rows="18" readonly>{esc(body)}</textarea>
 <div class="row"><button type="button" onclick="copyMail('{ident}', this)">Copy text</button>
 <a class="btn secondary" href="{esc(mailto)}">Open in mail app</a></div></div>"""
 
