@@ -59,6 +59,43 @@ def test_creating_an_invitation_shows_a_usable_link(client, user_id, monkeypatch
     assert "Anja" in client.get("/admin").text        # listed as an invitation
 
 
+def test_the_invitation_comes_with_a_ready_made_mail(client, user_id, monkeypatch):
+    monkeypatch.setenv("PUBLIC_URL", "https://mcp.garmin.example")
+    _login(client)
+    page = client.post("/admin/invite", data={"label": "Anja"}).text
+    code = page.split("signup?code=")[1].split("<")[0]
+
+    # Both texts carry the working link and the connector URL, and say what
+    # happens to the Garmin password - the question every tester asks.
+    for marker in ("Mail text (English)", "Mailtext (deutsch)"):
+        assert marker in page
+    assert page.count(f"signup?code={code}") >= 3          # link, EN, DE
+    assert "https://mcp.garmin.example/mcp" in page
+    assert "never stored" in page and "nicht gespeichert" in page
+    assert "expires in 7 days" in page and "7 Tagen ab" in page
+
+    # And a prefilled mail draft for the client that opens one.
+    assert "mailto:?subject=Your%20access" in page
+    assert 'onclick="copyMail(' in page
+
+
+def test_no_mail_text_before_an_invitation_exists(client, user_id):
+    _login(client)
+    page = client.get("/admin").text
+    assert "Mail text (English)" not in page and "mailto:" not in page
+
+
+def test_the_mail_text_is_escaped_not_injected(client, user_id):
+    """The link goes into a textarea and into a mailto href - both need
+    escaping, or a crafted PUBLIC_URL would break out."""
+    from garmin_mcp.web import invitation_mail
+    subject, body = invitation_mail(
+        "https://x.example/signup?code=a&b=<script>", "https://x.example")
+    assert "<script>" in body                       # raw text keeps it
+    page_html = client.post("/admin/invite", data={"label": "x"}).text
+    assert "<script>alert" not in page_html
+
+
 def test_accounts_and_their_garmin_state_are_listed(client, user_id):
     other = _second_account()
     users.set_garmin_tokens(other, "{}", "{}", "Bob Garmin")

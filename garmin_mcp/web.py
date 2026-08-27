@@ -32,6 +32,9 @@ label{font-weight:600;font-size:.9rem}
 .mono{font-family:ui-monospace,monospace;font-size:.85rem;color:#888;word-break:break-all}
 .err{color:#b23c3c}.ok{color:#2e7d32}
 .row{display:flex;gap:.5rem;margin-top:1.2rem;flex-wrap:wrap}
+textarea{width:100%;padding:.55rem;margin:.5rem 0;border:1px solid #8884;
+border-radius:6px;background:transparent;color:inherit;font-family:ui-monospace,monospace;
+font-size:.8rem;line-height:1.4;resize:vertical}
 table{width:100%;border-collapse:collapse;margin:.5rem 0}
 td{border-top:1px solid #8884;padding:.5rem .3rem;vertical-align:top;font-size:.92rem}
 h2{font-size:1.05rem;margin-top:1.6rem}
@@ -315,6 +318,115 @@ async def post_garmin_disconnect(request: Request) -> Response:
     return RedirectResponse("/account", status_code=303)
 
 
+# --- the invitation mail -----------------------------------------------------
+#
+# A bare link makes the recipient guess. These two texts say what the thing is,
+# what the three steps are, and what happens to their Garmin password - the
+# questions every tester asked. English first because the interface is English;
+# German because most people handing out invitations here write German mails.
+
+MAIL_SUBJECT_EN = "Your access to my Garmin connector"
+MAIL_SUBJECT_DE = "Dein Zugang zu meinem Garmin-Connector"
+
+MAIL_EN = """Hi,
+
+here is your personal invitation to {host} - a small server that lets Claude or
+ChatGPT answer questions about your own Garmin data. It only reads: it can
+never change or delete anything in your Garmin account.
+
+Three steps:
+
+1. Open this link. It works once and expires in 7 days:
+   {link}
+   Pick an e-mail address and a password. That is your login for the connector,
+   not your Garmin login.
+
+2. On your account page, click "Connect Garmin" and enter your Garmin e-mail
+   and password (plus your code if you use two-factor). Your Garmin password is
+   used once to obtain an access token and is never stored.
+
+3. Add the connector in your AI client:
+   - claude.ai: Settings > Connectors > Add custom connector, then enter
+     {mcp_url}
+   - ChatGPT: Settings > Connectors > Create (needs developer mode), same URL,
+     authentication "OAuth"
+
+Then just ask, for example: "What were my last three activities?" or
+"Why is my training readiness so low today?"
+
+You can delete your account, your tokens and all cached data at any time with
+one button on your account page.
+
+Step-by-step guide with screenshots of every setting:
+https://github.com/mskerwiderski/mcp-garmin/blob/main/docs/guest-access.md
+"""
+
+MAIL_DE = """Hallo,
+
+hier ist deine persoenliche Einladung fuer {host} - einen kleinen Server, mit
+dem Claude oder ChatGPT Fragen zu deinen eigenen Garmin-Daten beantworten
+koennen. Er liest nur: er kann in deinem Garmin-Konto nichts aendern oder
+loeschen.
+
+Drei Schritte:
+
+1. Oeffne diesen Link. Er funktioniert einmal und laeuft in 7 Tagen ab:
+   {link}
+   Waehle eine E-Mail-Adresse und ein Passwort. Das ist dein Login fuer den
+   Connector, nicht dein Garmin-Login.
+
+2. Klicke auf deiner Kontoseite auf "Connect Garmin" und gib deine
+   Garmin-Adresse und dein Garmin-Passwort ein (plus Code, falls du
+   Zwei-Faktor nutzt). Dein Garmin-Passwort wird einmal verwendet, um ein
+   Zugriffstoken zu holen, und nicht gespeichert.
+
+3. Trage den Connector in deinem KI-Client ein:
+   - claude.ai: Einstellungen > Connectors > Custom Connector hinzufuegen,
+     dort eintragen: {mcp_url}
+   - ChatGPT: Einstellungen > Connectors > Create (braucht Developer Mode),
+     dieselbe URL, Authentifizierung "OAuth"
+
+Dann einfach fragen, zum Beispiel: "Zeig mir meine letzten drei Aktivitaeten"
+oder "Warum ist meine Training Readiness heute so niedrig?"
+
+Du kannst dein Konto, deine Tokens und alle zwischengespeicherten Daten
+jederzeit mit einem Knopf auf deiner Kontoseite loeschen.
+
+Schritt fuer Schritt erklaert:
+https://github.com/mskerwiderski/mcp-garmin/blob/main/docs/guest-access.md
+"""
+
+
+def invitation_mail(link: str, base: str, german: bool = False) -> tuple[str, str]:
+    """(subject, body) for one invitation link."""
+    host = base.split("://", 1)[-1]
+    template = MAIL_DE if german else MAIL_EN
+    subject = MAIL_SUBJECT_DE if german else MAIL_SUBJECT_EN
+    return subject, template.format(host=host, link=link, mcp_url=f"{base}/mcp")
+
+
+def _mail_block(title: str, subject: str, body: str, ident: str) -> str:
+    mailto = ("mailto:?subject=" + urllib.parse.quote(subject)
+              + "&body=" + urllib.parse.quote(body))
+    return f"""<div class="card"><b>{esc(title)}</b><br>
+<span class="mono">Subject: {esc(subject)}</span>
+<textarea id="{ident}" rows="12" readonly>{esc(body)}</textarea>
+<div class="row"><button type="button" onclick="copyMail('{ident}', this)">Copy text</button>
+<a class="btn secondary" href="{esc(mailto)}">Open in mail app</a></div></div>"""
+
+
+_COPY_JS = """<script>
+function copyMail(id, btn) {
+  const field = document.getElementById(id);
+  navigator.clipboard.writeText(field.value).then(function () {
+    const before = btn.textContent;
+    btn.textContent = 'Copied';
+    setTimeout(function () { btn.textContent = before; }, 1500);
+  }, function () { field.select(); });
+}
+</script>"""
+
+
 # --- administration --------------------------------------------------------
 #
 # Reachable only for accounts with the admin flag, and a non-admin gets a 404
@@ -336,13 +448,19 @@ def _ms(value) -> str:
             if value else "-")
 
 
-def _admin_html(admin_id: int, new_link: str = "", error: str = "") -> str:
+def _admin_html(admin_id: int, new_link: str = "", error: str = "",
+                base: str = "") -> str:
     err = f'<p class="err">{esc(error)}</p>' if error else ""
     link = ""
     if new_link:
+        subj_en, body_en = invitation_mail(new_link, base)
+        subj_de, body_de = invitation_mail(new_link, base, german=True)
         link = (f'<div class="card"><b class="ok">Invitation created</b><br>'
                 f'<span class="mono">{esc(new_link)}</span><br>'
-                f'Valid for 7 days, single use. Send it to the person directly.</div>')
+                f'Valid for 7 days, single use.</div>'
+                + _mail_block("Mail text (English)", subj_en, body_en, "mail_en")
+                + _mail_block("Mailtext (deutsch)", subj_de, body_de, "mail_de")
+                + _COPY_JS)
 
     rows = []
     for u in users.list_users():
@@ -406,8 +524,9 @@ async def post_admin_invite(request: Request) -> Response:
         return err
     form = await request.form()
     code = users.create_invite(str(form.get("label") or "")[:80])
+    base = base_url(request)
     return page("Administration",
-                _admin_html(admin_id, f"{base_url(request)}/signup?code={code}"))
+                _admin_html(admin_id, f"{base}/signup?code={code}", base=base))
 
 
 async def post_admin_user(request: Request) -> Response:

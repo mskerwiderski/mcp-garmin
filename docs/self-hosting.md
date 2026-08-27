@@ -119,6 +119,14 @@ without a valid code, `/signup` returns 404.
 
 The same from the command line:
 
+On the **Administration** page of your account, "Create invitation link" gives
+you the link plus a ready-made invitation mail - in English and in German, with
+a copy button and a draft your mail client can open. The text explains the three
+steps the recipient has to take and answers the question everyone asks first:
+the Garmin password is used once and never stored.
+
+The same from the command line, which gives you the bare link:
+
 ```bash
 docker exec mcp-garmin garmin-mcp invite create --label "Anja"
 ```
