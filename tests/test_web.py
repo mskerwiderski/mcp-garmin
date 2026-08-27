@@ -64,12 +64,14 @@ def test_login_next_only_accepts_local_paths(client, user_id):
     assert r.headers["location"] == "/account"
 
 
-def test_account_shows_the_connector_url(client, user_id, monkeypatch):
+def test_account_shows_the_connector_url_ready_to_copy(client, user_id, monkeypatch):
     monkeypatch.setenv("PUBLIC_URL", "https://mcp.garmin.example")
     client.post("/login", data={"email": "anja@example.com",
                                 "password": "supersecret123"})
-    page = client.get("/account")
-    assert "https://mcp.garmin.example/mcp" in page.text
+    page = client.get("/account").text
+    assert ">https://mcp.garmin.example/mcp</textarea>" in page
+    assert "Copy address" in page
+    assert "no API key, no token" in page
 
 
 def test_delete_account_removes_everything(client, user_id):

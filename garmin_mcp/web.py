@@ -194,9 +194,12 @@ async def get_account(request: Request) -> Response:
 <p class="sub">{esc(user["email"])}</p>
 <div class="card"><b>Garmin Connect</b><br>{garmin}</div>
 <div class="card"><b>Use it in Claude or ChatGPT</b><br>
-Add a custom connector with this URL:<br>
-<span class="mono">{esc(url)}</span><br>
-You will be asked to log in here once and to confirm access.</div>
+Add a custom connector with this address - the same one for every client,
+including the <span class="mono">/mcp</span> at the end:
+<textarea id="mcp_url" rows="1" readonly>{esc(url)}</textarea>
+<div class="row"><button type="button" onclick="copyMail('mcp_url', this)">Copy address</button></div>
+You will be asked to log in here once and to confirm access. There is nothing
+else to enter: no API key, no token.</div>{_COPY_JS}
 {admin_card}
 <div class="row">
 <a class="btn secondary" href="/logout">Log out</a>
@@ -345,11 +348,19 @@ Three steps:
    and password (plus your code if you use two-factor). Your Garmin password is
    used once to obtain an access token and is never stored.
 
-3. Add the connector in your AI client:
-   - claude.ai: Settings > Connectors > Add custom connector, then enter
-     {mcp_url}
-   - ChatGPT: Settings > Connectors > Create (needs developer mode), same URL,
-     authentication "OAuth"
+3. Add the connector in Claude or ChatGPT. Whatever you use, the address to
+   enter is this one - copy it exactly, including the /mcp at the end:
+
+       {mcp_url}
+
+   - claude.ai: Settings > Connectors > Add custom connector, paste the
+     address, save. You will be sent back here to log in and confirm.
+   - ChatGPT: Settings > Connectors > Create (needs developer mode, under
+     Settings > Connectors > Advanced), paste the same address, set
+     authentication to "OAuth".
+   - Claude Desktop works too: Settings > Connectors, same address.
+
+   There is nothing else to fill in - no API key, no token, no port.
 
 Then just ask, for example: "What were my last three activities?" or
 "Why is my training readiness so low today?"
@@ -380,11 +391,20 @@ Drei Schritte:
    Zwei-Faktor nutzt). Dein Garmin-Passwort wird einmal verwendet, um ein
    Zugriffstoken zu holen, und nicht gespeichert.
 
-3. Trage den Connector in deinem KI-Client ein:
+3. Trage den Connector in Claude oder ChatGPT ein. Egal womit du arbeitest,
+   einzutragen ist immer diese Adresse - genau so, mit dem /mcp am Ende:
+
+       {mcp_url}
+
    - claude.ai: Einstellungen > Connectors > Custom Connector hinzufuegen,
-     dort eintragen: {mcp_url}
-   - ChatGPT: Einstellungen > Connectors > Create (braucht Developer Mode),
-     dieselbe URL, Authentifizierung "OAuth"
+     Adresse einfuegen, speichern. Du wirst danach hierher zurueckgeschickt,
+     loggst dich ein und bestaetigst den Zugriff.
+   - ChatGPT: Einstellungen > Connectors > Create (braucht Developer Mode,
+     unter Einstellungen > Connectors > Advanced), dieselbe Adresse einfuegen,
+     Authentifizierung auf "OAuth" stellen.
+   - Claude Desktop geht auch: Einstellungen > Connectors, gleiche Adresse.
+
+   Mehr ist nicht auszufuellen - kein API-Key, kein Token, kein Port.
 
 Dann einfach fragen, zum Beispiel: "Zeig mir meine letzten drei Aktivitaeten"
 oder "Warum ist meine Training Readiness heute so niedrig?"

@@ -70,7 +70,12 @@ def test_the_invitation_comes_with_a_ready_made_mail(client, user_id, monkeypatc
     for marker in ("Mail text (English)", "Mailtext (deutsch)"):
         assert marker in page
     assert page.count(f"signup?code={code}") >= 3          # link, EN, DE
-    assert "https://mcp.garmin.example/mcp" in page
+    # The address must stand on its own line in both texts, not trail off the
+    # end of a sentence - "which URL exactly?" is the question that follows.
+    assert page.count("    https://mcp.garmin.example/mcp") >= 2
+    assert "including the /mcp at the end" in page
+    assert "mit dem /mcp am Ende" in page
+    assert "no API key, no token, no port" in page
     assert "never stored" in page and "nicht gespeichert" in page
     assert "expires in 7 days" in page and "7 Tagen ab" in page
 
