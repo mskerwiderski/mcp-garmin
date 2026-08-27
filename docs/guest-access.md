@@ -86,8 +86,10 @@ click **Allow**.
 ### ChatGPT
 
 Needs developer mode - see [install-chatgpt.md](install-chatgpt.md) from step 4.
-Short version: **Settings → Connectors → Create**, paste the URL, authentication
-**OAuth**.
+Short version, in a browser: **Settings → Apps & Connectors → Advanced →
+Developer mode**, then **Create** on the same page, paste the URL,
+authentication **OAuth**. The menu is called just *Connectors* in older
+versions.
 
 ### Claude Desktop or Claude Code
 

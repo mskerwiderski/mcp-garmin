@@ -353,7 +353,7 @@ Three steps:
        {mcp_url}
 
    - claude.ai: Settings > Connectors > Add custom connector, paste the address, save. You will be sent back here to log in and confirm.
-   - ChatGPT: Settings > Connectors > Create (needs developer mode, under Settings > Connectors > Advanced), paste the same address, set authentication to "OAuth".
+   - ChatGPT (in a browser, not the phone app): Settings > "Apps & Connectors" (called "Connectors" in older versions) > Advanced > switch on Developer mode. Then, on the same page, Create - paste the same address and set authentication to "OAuth".
    - Claude Desktop works too: Settings > Connectors, same address.
 
    There is nothing else to fill in - no API key, no token, no port.
@@ -383,7 +383,7 @@ Drei Schritte:
        {mcp_url}
 
    - claude.ai: Einstellungen > Connectors > Custom Connector hinzufügen, Adresse einfügen, speichern. Du wirst hierher zurückgeschickt, loggst dich ein und bestätigst den Zugriff.
-   - ChatGPT: Einstellungen > Connectors > Create (braucht Developer Mode, unter Einstellungen > Connectors > Advanced), dieselbe Adresse einfügen, Authentifizierung auf "OAuth" stellen.
+   - ChatGPT (im Browser, nicht in der Handy-App): Einstellungen > "Apps & Connectors" (in älteren Versionen "Connectors") > Advanced > Developer Mode einschalten. Danach auf derselben Seite Create - dieselbe Adresse einfügen und Authentifizierung auf "OAuth" stellen.
    - Claude Desktop geht auch: Einstellungen > Connectors, gleiche Adresse.
 
    Mehr ist nicht auszufüllen - kein API-Key, kein Token, kein Port.

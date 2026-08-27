@@ -57,16 +57,24 @@ It is on the account page, in the box titled *Use it in Claude or ChatGPT*.
 
 ## 4. Turn on developer mode
 
-In ChatGPT: **Settings → Connectors → Advanced → Developer mode**.
+In ChatGPT: **Settings → Apps & Connectors → Advanced → Developer mode**.
 
-On Business, Enterprise and Edu workspaces this switch only appears once an
+The menu was called **Connectors** in earlier versions and is **Apps &
+Connectors** in current ones - the same place, only renamed. Some builds label
+the sub-page *Advanced settings* rather than *Advanced*.
+
+Two things this only works in: a **browser** (chatgpt.com), and a paid plan
+(Plus, Pro, Business, Enterprise, Edu). The iOS and Android apps do not offer
+it, and neither do some desktop app versions.
+
+On Business, Enterprise and Edu workspaces the switch only appears once an
 admin has enabled it in **Workspace Settings → Permissions & Roles → Connected
-data / custom MCP connectors**. If you cannot find the toggle, that is the
+data / custom MCP connectors**. If you cannot find the toggle, that is the usual
 reason - ask your admin, or use a personal Plus or Pro account.
 
 ## 5. Add the connector
 
-**Settings → Connectors → Create**, then fill in:
+**Settings → Apps & Connectors → Create**, then fill in:
 
 | Field | Value |
 |---|---|
@@ -98,9 +106,11 @@ setting sits next to the connector.
 
 ## Troubleshooting
 
-**Developer mode is not in Settings**
-Your plan does not include it, or a workspace admin has not enabled it. See
-step 4.
+**I cannot find Connectors in Settings at all**
+Look for **Apps & Connectors** - that is what the menu is called in current
+versions. If neither name is there: you are in the phone app or the desktop
+app (use chatgpt.com in a browser), or you are on the Free plan, or a workspace
+admin has not enabled it. See step 4.
 
 **"Could not connect" when saving the connector**
 Open `https://your-server/healthz` in a browser - it must answer `{"ok": true}`.
