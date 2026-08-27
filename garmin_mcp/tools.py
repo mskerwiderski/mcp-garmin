@@ -355,12 +355,19 @@ def register(server: MCPServer, get_session=current_session) -> MCPServer:
 
     @server.tool()
     @_guard
-    async def list_gear() -> list[dict]:
-        """Active gear (shoes, bikes, …) with type, brand, accumulated
-        distance and the distance limit set for it. Retired gear is not
-        listed."""
+    async def list_gear(include_retired: bool = False) -> list[dict]:
+        """Gear (shoes, bikes, …) with how much it has been used: number of
+        activities, kilometres, hours, days used and the date of first use.
+
+        Where a replacement limit is set, `limit_km` or `limit_hours` and
+        `pct_of_limit` say how close it is. include_retired adds gear that was
+        retired, which is off by default because most questions are about what
+        is in rotation."""
         c = await S().client()
-        return project.gear(await c.list_gear())
+        rows = await c.list_gear("ACTIVE")
+        if include_retired:
+            rows = rows + await c.list_gear("RETIRED")
+        return project.gear(rows)
 
     @server.tool()
     @_guard

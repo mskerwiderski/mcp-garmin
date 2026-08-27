@@ -163,16 +163,33 @@ def training_status(d: dict) -> dict:
 
 
 def gear(items: list[dict]) -> list[dict]:
-    return [compact({
-        "uuid": g.get("uuid"),
-        "name": g.get("name"),
-        "type": g.get("gearType"),
-        "brand": g.get("brand"),
-        "status": g.get("status"),
-        "used_km": _km(g.get("distanceUsedMeters")),
-        "limit_km": _km(g.get("maxUsageDistanceMeters")),
-        "first_use": g.get("firstUseDate"),
-    }) for g in items]
+    out = []
+    for g in items:
+        used_m = g.get("distanceUsedMeters")
+        limit_m = g.get("maxUsageDistanceMeters")
+        limit_s = g.get("maxUsageDurationSeconds")
+        row = {
+            "uuid": g.get("uuid"),
+            "name": g.get("name"),
+            "type": g.get("gearType"),
+            "brand": g.get("brand"),
+            "status": g.get("status"),
+            "activities": g.get("numActivitiesLinked"),
+            "used_km": _km(used_m),
+            "used_hours": _round((g.get("durationUsedSeconds") or 0) / 3600, 1) or None,
+            "days_used": g.get("daysUsed"),
+            "first_use": g.get("firstUseDate"),
+            # Garmin tracks a replacement limit by distance or by time; both are
+            # 0 or absent when nobody set one.
+            "limit_km": _km(limit_m) or None,
+            "limit_hours": _round((limit_s or 0) / 3600, 1) or None,
+        }
+        if limit_m and used_m:
+            row["pct_of_limit"] = round(used_m / limit_m * 100, 1)
+        elif limit_s and g.get("durationUsedSeconds"):
+            row["pct_of_limit"] = round(g["durationUsedSeconds"] / limit_s * 100, 1)
+        out.append(compact(row))
+    return out
 
 
 def profile(settings: dict, bio: dict, zones: list[dict]) -> dict:

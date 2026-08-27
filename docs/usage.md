@@ -291,7 +291,8 @@ The interesting ones. The model works these out by combining calls:
 > Two `list_activities` calls, summed.
 
 > **Which of my shoes is closest to its replacement distance?**
-> `list_gear`, comparing `used_km` against `limit_km`.
+> `list_gear` - it reports `pct_of_limit` directly where a limit is set, and
+> `activities`, `used_km`, `used_hours` and `days_used` where it is not.
 
 > **Was Sunday's race actually run at my threshold?**
 > `get_profile` for the threshold heart rate, `get_activity_streams` for the

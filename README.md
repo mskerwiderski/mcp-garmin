@@ -102,8 +102,8 @@ workouts and races, so "what was planned" and "what happened" can be compared.
 endurance and hill score, lifetime totals, and your personal records with the
 activity that set each one.
 
-**Context** - your thresholds and heart rate zones, your gear with accumulated
-distance, and the social challenges you run against friends, including the one
+**Context** - your thresholds and heart rate zones, your gear with the
+activities, kilometres, hours and days behind it, and the social challenges you run against friends, including the one
 currently in progress.
 
 See [docs/tools.md](docs/tools.md) for the full list with parameters.

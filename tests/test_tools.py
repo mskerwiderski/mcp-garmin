@@ -101,9 +101,15 @@ class FakeClient:
              "systolic": 118, "diastolic": 74, "pulse": 52}]}]}
 
     async def list_gear(self, statuses="ACTIVE"):
+        if statuses == "RETIRED":
+            return [{"uuid": "u0", "name": "Old Kayano", "gearType": "SHOES",
+                     "status": "RETIRED", "distanceUsedMeters": 900000,
+                     "numActivitiesLinked": 120}]
         return [{"uuid": "u1", "name": "Nimbus 26", "gearType": "SHOES",
                  "brand": "Asics", "status": "ACTIVE", "distanceUsedMeters": 412000,
-                 "maxUsageDistanceMeters": 800000}]
+                 "maxUsageDistanceMeters": 800000, "numActivitiesLinked": 47,
+                 "durationUsedSeconds": 133200, "daysUsed": 41,
+                 "firstUseDate": "2026-01-14"}]
 
     async def user_settings(self):
         return {"birthDate": "1975-01-01", "gender": "MALE", "weight": 74300,
@@ -273,11 +279,20 @@ def test_profile_converts_units(server):
     assert p["hr_zones"][0]["floors"] == [110, 130, 145, 160, 172]
 
 
-def test_gear_uses_the_v2_field_names(server):
+def test_gear_reports_how_much_it_has_been_used(server):
     g = call_list(server, "list_gear")
     assert g[0] == {"uuid": "u1", "name": "Nimbus 26", "type": "SHOES",
-                    "brand": "Asics", "status": "ACTIVE", "used_km": 412.0,
-                    "limit_km": 800.0}
+                    "brand": "Asics", "status": "ACTIVE", "activities": 47,
+                    "used_km": 412.0, "used_hours": 37.0, "days_used": 41,
+                    "first_use": "2026-01-14", "limit_km": 800.0,
+                    "pct_of_limit": 51.5}
+
+
+def test_retired_gear_is_off_by_default(server):
+    assert [g["name"] for g in call_list(server, "list_gear")] == ["Nimbus 26"]
+    both = call_list(server, "list_gear", include_retired=True)
+    assert [g["name"] for g in both] == ["Nimbus 26", "Old Kayano"]
+    assert both[1]["status"] == "RETIRED" and "pct_of_limit" not in both[1]
 
 
 def test_bad_day_is_rejected(server):

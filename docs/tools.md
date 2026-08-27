@@ -217,10 +217,18 @@ The table: `players` and a `leaderboard` with `rank`, `name`, `total_km` and
 
 ## Context
 
-### `list_gear()`
+### `list_gear(include_retired=False)`
 
-Active gear: `uuid`, `name`, `type` (`SHOES`, `BIKE`), `brand`, `status`,
-`used_km`, `limit_km`, `first_use`. Retired gear is not listed.
+Gear with its usage: `uuid`, `name`, `type` (`SHOES`, `BIKE`), `brand`,
+`status`, `activities`, `used_km`, `used_hours`, `days_used`, `first_use`.
+
+Where a replacement limit is set, `limit_km` or `limit_hours` appear together
+with `pct_of_limit`. Garmin tracks the limit either by distance or by time, and
+most accounts set none at all - then those three fields are absent rather than
+zero.
+
+`include_retired` adds gear that was retired; off by default, because most
+questions are about what is currently in rotation.
 
 ### `get_profile()`
 
