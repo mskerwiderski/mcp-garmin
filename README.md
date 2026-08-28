@@ -1,7 +1,8 @@
 # garmin-mcp
 
 **Talk to your Garmin data.** A read-only [MCP](https://modelcontextprotocol.io)
-server that lets Claude and ChatGPT answer questions about your training:
+server that lets Claude, ChatGPT and Mistral Le Chat answer questions about
+your training:
 activities, sleep, HRV, Body Battery, training status, challenge leaderboards -
 and, unlike other Garmin MCP servers, the **original FIT file** your watch
 wrote, including Connect-IQ sensor channels (Stryd, Moxy/SmO2, CORE).
@@ -24,15 +25,16 @@ It never writes to Garmin Connect. Every tool is read-only.
 | Status | invitation only, **open access planned** | available | available |
 | You need | an invitation | Python 3.12 | a server, a domain, Docker |
 | You run | nothing | the server on your machine | the server for you and your friends |
-| Works with | claude.ai, ChatGPT, Claude Desktop, Claude Code | Claude Desktop, Claude Code | everything |
+| Works with | claude.ai, ChatGPT, Le Chat, Claude Desktop, Claude Code | Claude Desktop, Claude Code | everything |
 | Setup | 5 minutes | 2 minutes | 20 minutes |
 | Your data lives | on the instance that invited you | only on your machine | on your server |
 | Guide | [Guest access](docs/guest-access.md) | [below](#quickstart-local) | [Self-hosting](docs/self-hosting.md) |
 
 **1. Guest access** - the only route that needs no infrastructure at all: open
 the invitation link, create an account, connect your Garmin, done. Like route 3,
-it works with **claude.ai in the browser and with ChatGPT** - route 2 cannot,
-because neither of those can start a program on your computer.
+it works with **claude.ai in the browser, with ChatGPT and with Mistral Le
+Chat** - route 2 cannot, because none of those can start a program on your
+computer.
 
 > **Guest access is not open yet.** It currently runs with a small group of
 > testers, by personal invitation. A public way to request an invitation is
@@ -77,6 +79,7 @@ Desktop: [docs/install-claude.md](docs/install-claude.md).
 | [Guest access](docs/guest-access.md) | Getting an invitation and using it, start to finish |
 | [Install for Claude](docs/install-claude.md) | Claude Desktop, Claude Code, claude.ai, troubleshooting |
 | [Install for ChatGPT](docs/install-chatgpt.md) | Developer mode, custom connector, troubleshooting |
+| [Install for Mistral Le Chat](docs/install-mistral.md) | Custom MCP connector, OAuth, troubleshooting |
 | [Usage examples](docs/usage.md) | What to ask, what comes back, what the numbers mean |
 | [Tool reference](docs/tools.md) | Every tool, its parameters and an example response |
 | [Self-hosting](docs/self-hosting.md) | Server setup, invitations, administration, upgrades |

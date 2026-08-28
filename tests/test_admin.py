@@ -234,7 +234,7 @@ def test_structure_still_gets_its_own_lines():
     _, body = invitation_mail("https://x.example/signup?code=1", "https://x.example")
     lines = body.split("\n")
     assert sum(1 for line in lines if line.startswith(("1. ", "2. ", "3. "))) == 3
-    assert sum(1 for line in lines if line.startswith("   - ")) == 3
+    assert sum(1 for line in lines if line.startswith("   - ")) == 4
     assert "       https://x.example/mcp" in lines
 
 
