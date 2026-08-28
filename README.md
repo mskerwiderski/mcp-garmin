@@ -48,6 +48,11 @@ Claude Code anyway and want to keep everything local.
 yourself, invite whoever you like, own the data. See
 [docs/self-hosting.md](docs/self-hosting.md).
 
+**On a phone.** Mistral Vibe (the app formerly called Le Chat) is the one client
+whose iOS and Android app can *add* a connector as well as use it, so route 1
+needs no computer at all. ChatGPT wants a browser for the setup, and there is no
+native macOS app for Mistral - that one is the browser too.
+
 ## Quickstart (local)
 
 ```bash
