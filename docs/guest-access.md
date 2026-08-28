@@ -91,11 +91,11 @@ Developer mode**, then **Create** on the same page, paste the URL,
 authentication **OAuth**. The menu is called just *Connectors* in older
 versions.
 
-### Mistral Le Chat
+### Mistral Vibe (formerly Le Chat)
 
 **Connectors → + Add Connector → Custom MCP Connector**, name it `garmin` (one
-word, no spaces), paste the URL, save. Le Chat notices the server uses OAuth and
-sends you to its login page. Details in
+word, no spaces), paste the URL, save. Vibe notices the server uses OAuth and sends
+you to its login page. It works in the phone app too. Details in
 [install-mistral.md](install-mistral.md).
 
 ### Claude Desktop or Claude Code

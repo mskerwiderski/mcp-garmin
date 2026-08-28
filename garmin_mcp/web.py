@@ -193,7 +193,7 @@ async def get_account(request: Request) -> Response:
     return page("Your account", f"""<h1>Your account</h1>
 <p class="sub">{esc(user["email"])}</p>
 <div class="card"><b>Garmin Connect</b><br>{garmin}</div>
-<div class="card"><b>Use it in Claude, ChatGPT or Le Chat</b><br>
+<div class="card"><b>Use it in Claude, ChatGPT or Mistral Vibe</b><br>
 Add a custom connector with this address - the same one for every client,
 including the <span class="mono">/mcp</span> at the end:
 <textarea id="mcp_url" rows="1" readonly>{esc(url)}</textarea>
@@ -338,7 +338,7 @@ MAIL_SUBJECT_DE = "Dein Zugang zu meinem Garmin-Connector"
 # the bullets, and the addresses.
 MAIL_EN = """Hi,
 
-here is your personal invitation to {host} - a small server that lets Claude, ChatGPT or Mistral Le Chat answer questions about your own Garmin data. It only reads: it can never change or delete anything in your Garmin account.
+here is your personal invitation to {host} - a small server that lets Claude, ChatGPT or Mistral Vibe answer questions about your own Garmin data. It only reads: it can never change or delete anything in your Garmin account.
 
 Three steps:
 
@@ -348,13 +348,13 @@ Three steps:
 
 2. On your account page, click "Connect Garmin" and enter your Garmin e-mail and password (plus your code if you use two-factor). Your Garmin password is used once to obtain an access token and is never stored.
 
-3. Add the connector in Claude, ChatGPT or Mistral Le Chat. Whatever you use, the address to enter is this one - copy it exactly, including the /mcp at the end:
+3. Add the connector in Claude, ChatGPT or Mistral Vibe. Whatever you use, the address to enter is this one - copy it exactly, including the /mcp at the end:
 
        {mcp_url}
 
    - claude.ai: Settings > Connectors > Add custom connector, paste the address, save. You will be sent back here to log in and confirm.
    - ChatGPT (in a browser, not the phone app): Settings > "Apps & Connectors" (called "Connectors" in older versions) > Advanced > switch on Developer mode. Then, on the same page, Create - paste the same address and set authentication to "OAuth".
-   - Mistral Le Chat: Connectors > + Add Connector > Custom MCP Connector, name it "garmin" (one word, no spaces), paste the same address. Le Chat notices the login by itself.
+   - Mistral Vibe (the app formerly called Le Chat, in the browser or on your phone): Connectors > + Add Connector > Custom MCP Connector, name it "garmin" (one word, no spaces), paste the same address. It notices the login by itself.
    - Claude Desktop works too: Settings > Connectors, same address.
 
    There is nothing else to fill in - no API key, no token, no port.
@@ -369,7 +369,7 @@ https://github.com/mskerwiderski/mcp-garmin/blob/main/docs/guest-access.md
 
 MAIL_DE = """Hallo,
 
-hier ist deine persönliche Einladung für {host} - einen kleinen Server, mit dem Claude, ChatGPT oder Mistral Le Chat Fragen zu deinen eigenen Garmin-Daten beantworten können. Er liest nur: er kann in deinem Garmin-Konto nichts ändern oder löschen.
+hier ist deine persönliche Einladung für {host} - einen kleinen Server, mit dem Claude, ChatGPT oder Mistral Vibe Fragen zu deinen eigenen Garmin-Daten beantworten können. Er liest nur: er kann in deinem Garmin-Konto nichts ändern oder löschen.
 
 Drei Schritte:
 
@@ -379,13 +379,13 @@ Drei Schritte:
 
 2. Klicke auf deiner Kontoseite auf "Connect Garmin" und gib deine Garmin-Adresse und dein Garmin-Passwort ein (plus Code, falls du Zwei-Faktor nutzt). Dein Garmin-Passwort wird einmal verwendet, um ein Zugriffstoken zu holen, und nicht gespeichert.
 
-3. Trage den Connector in Claude, ChatGPT oder Mistral Le Chat ein. Egal womit du arbeitest, einzutragen ist immer diese Adresse - genau so, mit dem /mcp am Ende:
+3. Trage den Connector in Claude, ChatGPT oder Mistral Vibe ein. Egal womit du arbeitest, einzutragen ist immer diese Adresse - genau so, mit dem /mcp am Ende:
 
        {mcp_url}
 
    - claude.ai: Einstellungen > Connectors > Custom Connector hinzufügen, Adresse einfügen, speichern. Du wirst hierher zurückgeschickt, loggst dich ein und bestätigst den Zugriff.
    - ChatGPT (im Browser, nicht in der Handy-App): Einstellungen > "Apps & Connectors" (in älteren Versionen "Connectors") > Advanced > Developer Mode einschalten. Danach auf derselben Seite Create - dieselbe Adresse einfügen und Authentifizierung auf "OAuth" stellen.
-   - Mistral Le Chat: Connectors > + Add Connector > Custom MCP Connector, als Name "garmin" (ein Wort, keine Leerzeichen), dieselbe Adresse einfügen. Den Login erkennt Le Chat von selbst.
+   - Mistral Vibe (die App, die frueher Le Chat hiess - im Browser oder auf dem Handy): Connectors > + Add Connector > Custom MCP Connector, als Name "garmin" (ein Wort, keine Leerzeichen), dieselbe Adresse einfügen. Den Login erkennt sie von selbst.
    - Claude Desktop geht auch: Einstellungen > Connectors, gleiche Adresse.
 
    Mehr ist nicht auszufüllen - kein API-Key, kein Token, kein Port.
