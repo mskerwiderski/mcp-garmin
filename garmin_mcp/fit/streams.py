@@ -1,4 +1,4 @@
-# Vendored from MyFITContainer e9931f0: app/streams.py
+# Vendored from MyFITContainer e9931f0: app/streams.py (+ _merge_same_ts from be97748)
 # Source of truth stays MFC; changes here are marked "mcp-garmin addition".
 
 """Zeitreihen (record-Streams) aus einer FIT für die Detail-/Grafik-Ansicht.
@@ -214,6 +214,23 @@ def _read_records(data: bytes) -> tuple[list[dict], list[dict], list[dict]]:
                 elif frame.name == "lap":
                     laps.append({f.name: f.value for f in frame.fields})
     return recs, sess, laps
+
+
+def _merge_same_ts(recs: list[dict]) -> list[dict]:
+    """Merge records that share a timestamp into one.
+
+    The COROS PACE Pro writes TWO record messages per second: one with the
+    Stryd CIQ fields (Air Power, Form Power, LSS), one with the native fields
+    (GPS, speed, power, altitude). The index-stride downsampling then hit
+    almost only the CIQ records - 2 of 2885 GPS points, no speed/altitude on
+    the chart. Display streams only; byte patchers keep one entry per message."""
+    out: list[dict] = []
+    for r in recs:
+        if out and out[-1].get("timestamp") == r.get("timestamp"):
+            out[-1].update({k: v for k, v in r.items() if v is not None})
+        else:
+            out.append(dict(r))
+    return out
 
 
 def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -491,6 +508,7 @@ def extract_streams(data: bytes, lap_names: dict | None = None,
         return empty
     if not recs:
         return empty
+    recs = _merge_same_ts(recs)
 
     t0 = next((r["timestamp"] for r in recs if isinstance(r.get("timestamp"), datetime)), None)
     n = len(recs)
